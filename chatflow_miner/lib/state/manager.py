@@ -10,6 +10,10 @@ def initialize_session_state() -> None:
         st.session_state.log_eventos = None
     if "load_info" not in st.session_state:
         st.session_state.load_info = None
+    if "process_models" not in st.session_state:
+        # process models deve ser um dicionário nome -> modelo
+        st.session_state.process_models = {}
+
 
 
 def open_input_dialog() -> None:

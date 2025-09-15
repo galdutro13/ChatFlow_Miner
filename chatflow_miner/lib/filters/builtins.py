@@ -55,12 +55,11 @@ class CaseHasActivityFilter(BaseFilter):
 
     def mask(self, df: pd.DataFrame) -> pd.Series:
         self._check_columns(df)
-        # Identifica CASE_IDs que possuem a atividade alvo
-        cases_ok = (
-            df.loc[df[COLUMN_ACTIVITY] == self.activity_name, COLUMN_CASE_ID]
-              .dropna()
-              .unique()
-        )
+        # Identifica CASE_IDs que possuem a atividade alvo (evita chamadas encadeadas ambíguas)
+        sel = df[COLUMN_ACTIVITY] == self.activity_name
+        case_ids = df.loc[sel, COLUMN_CASE_ID]
+        case_ids = case_ids.dropna()
+        cases_ok = pd.unique(case_ids.to_numpy())
         return df[COLUMN_CASE_ID].isin(cases_ok)
 
 

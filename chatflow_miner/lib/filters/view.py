@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Sequence, List, Iterable, Any
+from typing import Sequence, List, Any, Union
+from collections.abc import Iterable
 import pandas as pd
 
 from .base import BaseFilter, _ensure_bool_series
@@ -27,7 +28,7 @@ class EventLogView:
     base_df: pd.DataFrame
     filters: Sequence[BaseFilter] = field(default_factory=tuple)
 
-    def filter(self, flt: BaseFilter | Sequence[BaseFilter]) -> "EventLogView":
+    def filter(self, flt: Union[BaseFilter, Sequence[BaseFilter]]) -> "EventLogView":
         """Retorna nova view com filtros adicionais (lazy)."""
         new_filters: List[BaseFilter] = list(self.filters)
         if isinstance(flt, Iterable) and not isinstance(flt, BaseFilter):
