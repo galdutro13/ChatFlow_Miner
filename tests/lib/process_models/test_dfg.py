@@ -30,6 +30,8 @@ class TempModulePatcher:
 
 def make_pm4py_stub(discover_return):
     pm4py = types.ModuleType("pm4py")
+    # Mark as a package so nested imports are permitted
+    pm4py.__path__ = []
 
     def discover_dfg(df):  # signature compatible with usage in DFGModel
         return discover_return
@@ -80,7 +82,14 @@ def test_dfgmodel_compute_returns_pm4py_discover_output():
     pm4py_stub = make_pm4py_stub(expected)
     graphviz_stub = make_graphviz_stub()
 
-    with TempModulePatcher({"pm4py": pm4py_stub, "graphviz": graphviz_stub}):
+    mapping = {
+        "pm4py": pm4py_stub,
+        "pm4py.visualization": pm4py_stub.visualization,
+        "pm4py.visualization.dfg": pm4py_stub.visualization.dfg,
+        "pm4py.visualization.dfg.visualizer": pm4py_stub.visualization.dfg.visualizer,
+        "graphviz": graphviz_stub,
+    }
+    with TempModulePatcher(mapping):
         from chatflow_miner.lib.process_models.dfg import DFGModel
         model = DFGModel()
         result = model.compute(df)
@@ -99,7 +108,14 @@ def test_dfgmodel_to_graphviz_returns_visualizer_output_structure():
     pm4py_stub = make_pm4py_stub(dfg_tuple)
     graphviz_stub = make_graphviz_stub()
 
-    with TempModulePatcher({"pm4py": pm4py_stub, "graphviz": graphviz_stub}):
+    mapping = {
+        "pm4py": pm4py_stub,
+        "pm4py.visualization": pm4py_stub.visualization,
+        "pm4py.visualization.dfg": pm4py_stub.visualization.dfg,
+        "pm4py.visualization.dfg.visualizer": pm4py_stub.visualization.dfg.visualizer,
+        "graphviz": graphviz_stub,
+    }
+    with TempModulePatcher(mapping):
         from chatflow_miner.lib.process_models.dfg import DFGModel
         model = DFGModel()
         computed = model.compute(df)

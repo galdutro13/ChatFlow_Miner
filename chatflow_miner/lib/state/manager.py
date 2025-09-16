@@ -15,7 +15,6 @@ def initialize_session_state() -> None:
         st.session_state.process_models = {}
 
 
-
 def open_input_dialog() -> None:
     st.session_state.input_dialog = True
 
