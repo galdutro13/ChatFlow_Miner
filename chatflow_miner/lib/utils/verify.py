@@ -1,10 +1,19 @@
-from typing import Any, Dict, Tuple
-
 from typing import Set
 import pandas as pd
-import streamlit as st
 
-REQUIRED_COLUMNS: Set[str] = {"CASE_ID", "ACTIVITY", "START_TIMESTAMP", "END_TIMESTAMP"}
+from chatflow_miner.lib.constants import (
+    COLUMN_CASE_ID,
+    COLUMN_ACTIVITY,
+    COLUMN_START_TS,
+    COLUMN_END_TS
+)
+
+REQUIRED_COLUMNS: Set[str] = {
+    COLUMN_CASE_ID,
+    COLUMN_ACTIVITY,
+    COLUMN_START_TS,
+    COLUMN_END_TS
+}
 
 def verify_format(log: pd.DataFrame) -> None:
     """
