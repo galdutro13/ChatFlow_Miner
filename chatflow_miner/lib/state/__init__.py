@@ -4,7 +4,10 @@ from .manager import (initialize_session_state,
                       set_log_eventos,
                       get_log_eventos,
                       reset_log_eventos,
-                      get_log_eventos)
+                      add_process_model,
+                      remove_process_model,
+                      get_process_model,
+                      list_process_models)
 
 __all__ = ["initialize_session_state",
            "open_input_dialog",
@@ -12,4 +15,7 @@ __all__ = ["initialize_session_state",
            "set_log_eventos",
            "get_log_eventos",
            "reset_log_eventos",
-           "get_log_eventos"]
+           "add_process_model",
+           "remove_process_model",
+           "get_process_model",
+           "list_process_models"]
