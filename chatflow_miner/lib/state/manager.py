@@ -2,6 +2,8 @@ from typing import Dict, Tuple, Optional, Union, Sequence, Set
 import pandas as pd
 import streamlit as st
 
+from chatflow_miner.lib.process_models import ProcessModelRegistry
+
 
 def initialize_session_state() -> None:
     if "input_dialog" not in st.session_state:
@@ -12,7 +14,7 @@ def initialize_session_state() -> None:
         st.session_state.load_info = None
     if "process_models" not in st.session_state:
         # process models deve ser um dicionário nome -> modelo
-        st.session_state.process_models = {}
+        st.session_state.process_models = ProcessModelRegistry()
 
 
 def open_input_dialog() -> None:
