@@ -3,7 +3,6 @@ import streamlit as st
 from chatflow_miner.lib.inputs import input_dataset
 from chatflow_miner.lib.state import (initialize_session_state,
                                     open_input_dialog,
-                                    close_input_dialog,
                                     get_log_eventos)
 from chatflow_miner.lib.filters import AgentFilter, EventLogView
 from chatflow_miner.lib.process_models import ProcessModelView, DFGModel
@@ -12,7 +11,7 @@ st.set_page_config(page_title="ChatFlow Miner", layout="wide")
 initialize_session_state()
 
 @st.fragment
-def filter():
+def filter_section():
     st.write("Filtro de dados - Em construção")
     options = ["ai", "human", "ambos"]
     filter_selection = st.segmented_control("Filtro de AGENTE", options, selection_mode="single", default=options[2])
@@ -35,9 +34,9 @@ def filter():
         st.graphviz_chart(dfg)
 
 col1, col2 = st.columns(2)
-# TODO: abaixo das duas colunas, mostrar seletor de modelos de processos com o primeiro item (padrão) selecionado sendo o placeholder para criar novo modelo.
-model_selector_placeholder = "Criar novo modelo de processo..."
-model_selector = st.selectbox(label="Modelos de processo", options=[model_selector_placeholder], width=400)
+# Seletor de modelos de processos com o primeiro item (padrão) selecionado sendo o placeholder para criar novo modelo.
+model_names = list(st.session_state.process_models.names)
+model_selector = st.selectbox(label="Modelos de processo", options=model_names, width=400)
 
 with col1:
     col1.button("Carregar", on_click=open_input_dialog)
@@ -51,4 +50,4 @@ with col2:
         st.text("Nenhum arquivo carregado.")
 
 if get_log_eventos() is not None:
-    filter()
+    filter_section()

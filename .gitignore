@@ -1,2 +1,7 @@
 ChatFlow_Miner.code-workspace
-*__pycache__*
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so

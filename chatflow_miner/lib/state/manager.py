@@ -15,6 +15,20 @@ def initialize_session_state() -> None:
     if "process_models" not in st.session_state:
         # process models deve ser um dicionário nome -> modelo
         st.session_state.process_models = ProcessModelRegistry()
+        initialize_process_models()
+
+
+def initialize_process_models() -> None:
+    """
+    Inicializa o registry de process_models com o item placeholder
+    "Criar novo modelo de processo...".
+    """
+    if "process_models" not in st.session_state:
+        st.session_state.process_models = ProcessModelRegistry()
+    
+    # Adiciona o placeholder apenas se o registry estiver vazio
+    if len(st.session_state.process_models) == 0:
+        st.session_state.process_models.add("Criar novo modelo de processo...")
 
 
 def open_input_dialog() -> None:
