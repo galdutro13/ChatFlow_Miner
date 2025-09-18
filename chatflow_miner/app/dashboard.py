@@ -45,7 +45,7 @@ st.selectbox(
     placeholder=None,
 )
 
-if get_log_eventos() is not None:
+if disabled:
     if get_selected_model() is None:
         # Exibe interface de filtros para criar novo
         filter_section()
