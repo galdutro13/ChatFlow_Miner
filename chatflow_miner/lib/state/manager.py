@@ -28,9 +28,17 @@ def initialize_session_state() -> None:
     if "load_info" not in st.session_state:
         st.session_state.load_info = None
     if "process_models" not in st.session_state:
-        # process models deve ser um dicionário nome -> modelo
+        # Registry de modelos de processo (mapping nome -> ProcessModelView | None)
         st.session_state.process_models = ProcessModelRegistry()
         initialize_process_models()
+
+    # Seleção atual no seletor de modelos
+    if "selected_model" not in st.session_state:
+        st.session_state.selected_model = None
+
+    # Último modelo gerado (não persistido) para exibição no diálogo
+    if "latest_generated_model" not in st.session_state:
+        st.session_state.latest_generated_model = None
 
 
 def initialize_process_models() -> None:
