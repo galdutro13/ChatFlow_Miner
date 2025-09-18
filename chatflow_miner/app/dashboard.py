@@ -16,7 +16,8 @@ initialize_session_state()
 col1, col2 = st.columns(2)
 
 with col1:
-    col1.button("Carregar", on_click=open_input_dialog)
+    disabled = get_log_eventos() is not None # Desabilitar se já houver um arquivo carregado
+    col1.button("Carregar", on_click=open_input_dialog, type="primary", disabled=disabled)
     if st.session_state.input_dialog:
         input_dataset()
 
