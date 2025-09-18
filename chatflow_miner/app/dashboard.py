@@ -6,6 +6,7 @@ from chatflow_miner.lib.state import (
     open_input_dialog,
     get_log_eventos,
     get_selected_model,
+    reset_log_eventos,
 )
 from chatflow_miner.lib.filters.streamlit_fragments import filter_section
 from chatflow_miner.lib.process_models.ui import render_saved_model_ui
@@ -25,7 +26,13 @@ with col1:
 with col2:
     # load_info já foi pré-computado acima
     if load_info is not None:
-        st.text(f"Usando o arquivo: {load_info['file_name']}")
+        txt_col, btn_col = st.columns([6, 1])
+        with txt_col:
+            st.text(f"Usando o arquivo: {load_info['file_name']}")
+        with btn_col:
+            if st.button("Remover", type="tertiary", key="remove-log"):
+                reset_log_eventos()
+                st.rerun()
     else:
         st.text("Nenhum arquivo carregado.")
 
@@ -47,11 +54,10 @@ st.selectbox(
     placeholder=None,
 )
 
-if disabled:
-    if current_selected is None:
-        # Exibe interface de filtros para criar novo
-        filter_section()
-    else:
-        # Exibe modelo salvo selecionado
-        render_saved_model_ui(current_selected)
+if current_selected is None:
+    # Exibe interface de filtros; desabilita quando não há log carregado
+    filter_section(disabled=not disabled)
+else:
+    # Exibe modelo salvo selecionado independentemente de haver log carregado
+    render_saved_model_ui(current_selected)
         
