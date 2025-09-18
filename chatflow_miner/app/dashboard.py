@@ -14,8 +14,18 @@ from chatflow_miner.lib.process_models.ui import render_saved_model_ui
 st.set_page_config(page_title="ChatFlow Miner", layout="wide")
 initialize_session_state()
 
-
 col1, col2 = st.columns(2)
+
+with col1:
+    col1.button("Carregar", on_click=open_input_dialog)
+    if st.session_state.input_dialog:
+        input_dataset()
+
+with col2:
+    if (load_info := get_log_eventos(which="load_info")) is not None:
+        st.text(f"Usando o arquivo: {load_info['file_name']}")
+    else:
+        st.text("Nenhum arquivo carregado.")
 
 # Seletor de modelos de processos: placeholder seguido dos nomes salvos
 placeholder = "Criar novo modelo de processo..."
@@ -36,17 +46,6 @@ selected_name = st.selectbox(
     key="selector.selected",
     placeholder=None,
 )
-
-with col1:
-    col1.button("Carregar", on_click=open_input_dialog)
-    if st.session_state.input_dialog:
-        input_dataset()
-
-with col2:
-    if (load_info := get_log_eventos(which="load_info")) is not None:
-        st.text(f"Usando o arquivo: {load_info['file_name']}")
-    else:
-        st.text("Nenhum arquivo carregado.")
 
 
 # Sincroniza seleção no estado
