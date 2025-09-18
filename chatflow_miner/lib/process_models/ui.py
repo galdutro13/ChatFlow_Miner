@@ -9,6 +9,7 @@ import streamlit as st
 from .dfg import DFGModel
 from .view import ProcessModelView
 from ..filters.view import EventLogView
+from ..state.manager import set_selected_model
 
 
 # -----------------------------
@@ -109,7 +110,7 @@ def save_model(name: str, model_data: Dict[str, Any]) -> None:
 
     view = _build_view_from_model_data(model_data)
     st.session_state.process_models.add(name, view)
-    st.session_state.selected_model = name
+    set_selected_model(name)
 
     # Fechar o diálogo
     st.rerun()

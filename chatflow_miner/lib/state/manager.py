@@ -41,6 +41,16 @@ def initialize_session_state() -> None:
         st.session_state.latest_generated_model = None
 
 
+def get_selected_model() -> Optional[str]:
+    """Retorna o nome do modelo de processo selecionado (ou None)."""
+    return st.session_state.get("selected_model")
+
+
+def set_selected_model(name: Optional[str]) -> None:
+    """Define o nome do modelo de processo selecionado (ou None para voltar à criação)."""
+    st.session_state.selected_model = name
+
+
 def initialize_process_models() -> None:
     """
     Inicializa o registry de process_models com o item placeholder

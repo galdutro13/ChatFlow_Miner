@@ -5,6 +5,8 @@ from chatflow_miner.lib.state import (
     initialize_session_state,
     open_input_dialog,
     get_log_eventos,
+    get_selected_model,
+    set_selected_model,
 )
 from chatflow_miner.lib.filters.streamlit_fragments import filter_section
 from chatflow_miner.lib.process_models.ui import render_saved_model_ui
@@ -25,9 +27,10 @@ if not model_names or model_names[0] != placeholder:
         model_names = [placeholder]
 
 selected_index = 0
-if st.session_state.selected_model is not None:
+current_selected = get_selected_model()
+if current_selected is not None:
     try:
-        selected_index = model_names.index(st.session_state.selected_model)
+        selected_index = model_names.index(current_selected)
     except ValueError:
         selected_index = 0
 
@@ -41,9 +44,9 @@ selected_name = st.selectbox(
 
 # Sincroniza seleção no estado
 if selected_name == placeholder:
-    st.session_state.selected_model = None
+    set_selected_model(None)
 else:
-    st.session_state.selected_model = selected_name
+    set_selected_model(selected_name)
 
 with col1:
     col1.button("Carregar", on_click=open_input_dialog)
@@ -57,10 +60,10 @@ with col2:
         st.text("Nenhum arquivo carregado.")
 
 if get_log_eventos() is not None:
-    if st.session_state.selected_model is None:
+    if get_selected_model() is None:
         # Exibe interface de filtros para criar novo
         filter_section()
     else:
         # Exibe modelo salvo selecionado
-        render_saved_model_ui(st.session_state.selected_model)
+        render_saved_model_ui(get_selected_model())
         
