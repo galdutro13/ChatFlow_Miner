@@ -6,7 +6,6 @@ from chatflow_miner.lib.state import (
     open_input_dialog,
     get_log_eventos,
     get_selected_model,
-    set_selected_model,
 )
 from chatflow_miner.lib.filters.streamlit_fragments import filter_section
 from chatflow_miner.lib.process_models.ui import render_saved_model_ui
@@ -27,8 +26,6 @@ with col2:
     else:
         st.text("Nenhum arquivo carregado.")
 
-# Seletor de modelos de processos: placeholder seguido dos nomes salvos
-placeholder = "Criar novo modelo de processo..."
 model_names = list(st.session_state.process_models.names)
 
 selected_index = 0
@@ -39,20 +36,13 @@ if current_selected is not None:
     except ValueError:
         selected_index = 0
 
-selected_name = st.selectbox(
+st.selectbox(
     label="Modelos de processo",
     options=model_names,
     index=selected_index,
-    key="selector.selected",
+    key="selected_model", # Referenciando o estado da sessão st.session_state.selected_model
     placeholder=None,
 )
-
-
-# Sincroniza seleção no estado
-if selected_name == placeholder:
-    set_selected_model(None)
-else:
-    set_selected_model(selected_name)
 
 if get_log_eventos() is not None:
     if get_selected_model() is None:

@@ -5,6 +5,7 @@ import streamlit as st
 from chatflow_miner.lib.process_models import ProcessModelRegistry, ProcessModelView, DFGModel
 from chatflow_miner.lib.filters.view import EventLogView
 
+PLACEHOLDER = "Criar novo modelo de processo..."
 
 def initialize_session_state() -> None:
     """
@@ -34,7 +35,7 @@ def initialize_session_state() -> None:
 
     # Seleção atual no seletor de modelos
     if "selected_model" not in st.session_state:
-        st.session_state.selected_model = None
+        st.session_state.selected_model = PLACEHOLDER
 
     # Último modelo gerado (não persistido) para exibição no diálogo
     if "latest_generated_model" not in st.session_state:
@@ -43,7 +44,9 @@ def initialize_session_state() -> None:
 
 def get_selected_model() -> Optional[str]:
     """Retorna o nome do modelo de processo selecionado (ou None)."""
-    return st.session_state.get("selected_model")
+    if st.session_state.selected_model != PLACEHOLDER:
+        return st.session_state.get("selected_model")
+    return None
 
 
 def set_selected_model(name: Optional[str]) -> None:
@@ -58,10 +61,10 @@ def initialize_process_models() -> None:
     """
     if "process_models" not in st.session_state:
         st.session_state.process_models = ProcessModelRegistry()
-    
+
     # Adiciona o placeholder apenas se o registry estiver vazio
     if len(st.session_state.process_models) == 0:
-        st.session_state.process_models.add("Criar novo modelo de processo...")
+        st.session_state.process_models.add(PLACEHOLDER)
 
 
 def open_input_dialog() -> None:
