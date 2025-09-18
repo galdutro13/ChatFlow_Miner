@@ -1,7 +1,8 @@
 import streamlit as st
 
 from chatflow_miner.lib.state import get_log_eventos
-from chatflow_miner.lib.filters import AgentFilter, EventLogView
+from chatflow_miner.lib.filters.builtins import AgentFilter
+from chatflow_miner.lib.filters.view import EventLogView
 from chatflow_miner.lib.process_models.ui import (
     generate_process_model,
     show_generated_model_dialog,
@@ -28,8 +29,8 @@ def filter_section():
     st.dataframe(event_log_view.compute())
 
     # Área inferior com botão à direita
-    spacer, right = st.columns([6, 1])
-    with right:
+    _, right_col = st.columns([6, 1])
+    with right_col:
         if st.button("Gerar", key="filters.generate"):
             try:
                 with st.spinner("Gerando modelo..."):
@@ -37,6 +38,8 @@ def filter_section():
                     st.session_state.latest_generated_model = model_data
                 # Abre diálogo para visualização e salvamento
                 show_generated_model_dialog()
+            except ValueError as exc:
+                st.error(str(exc))
             except Exception as exc:
                 st.error("Falha ao gerar o modelo de processo.")
                 st.exception(exc)

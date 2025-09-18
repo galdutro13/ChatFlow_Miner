@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 from chatflow_miner.lib.process_models import ProcessModelRegistry, ProcessModelView, DFGModel
-from chatflow_miner.lib.filters import EventLogView
+from chatflow_miner.lib.filters.view import EventLogView
 
 
 def initialize_session_state() -> None:
