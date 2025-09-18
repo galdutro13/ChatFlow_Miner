@@ -57,7 +57,7 @@ def render_process_graph(model_data: Dict[str, Any]) -> None:
     if model_data.get("type") == "dfg":
         dfg_tuple = model_data["data"]
         gviz = DFGModel().to_graphviz(dfg_tuple, bgcolor="white", rankdir="LR")
-        st.graphviz_chart(gviz, use_container_width=True, key="graph.view")
+        st.graphviz_chart(gviz, use_container_width=True)
     else:
         st.warning("Tipo de modelo desconhecido para visualização.")
 
@@ -154,7 +154,7 @@ def render_saved_model_ui(selected_name: str) -> None:
 
     try:
         gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
-        st.graphviz_chart(gviz, use_container_width=True, key="graph.saved")
+        st.graphviz_chart(gviz, use_container_width=True)
     except Exception as exc:
         st.error("Falha ao renderizar o modelo salvo.")
         st.exception(exc)
