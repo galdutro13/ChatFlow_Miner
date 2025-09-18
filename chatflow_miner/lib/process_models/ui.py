@@ -57,7 +57,7 @@ def render_process_graph(model_data: Dict[str, Any]) -> None:
     if model_data.get("type") == "dfg":
         dfg_tuple = model_data["data"]
         gviz = DFGModel().to_graphviz(dfg_tuple, bgcolor="white", rankdir="LR")
-        st.graphviz_chart(gviz, use_container_width=True)
+        st.graphviz_chart(gviz, width="stretch")
     else:
         st.warning("Tipo de modelo desconhecido para visualização.")
 
@@ -131,7 +131,7 @@ def show_generated_model_dialog() -> None:
 
     with st.form(key="dialog.form.save"):
         name = st.text_input("Nome do modelo", key="dialog.name")
-        submitted = st.form_submit_button("Salvar", use_container_width=True)
+        submitted = st.form_submit_button("Salvar", width="stretch")
         if submitted:
             try:
                 with st.spinner("Salvando modelo..."):
@@ -154,7 +154,7 @@ def render_saved_model_ui(selected_name: str) -> None:
 
     try:
         gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
-        st.graphviz_chart(gviz, use_container_width=True)
+        st.graphviz_chart(gviz, width="stretch")
     except Exception as exc:
         st.error("Falha ao renderizar o modelo salvo.")
         st.exception(exc)
