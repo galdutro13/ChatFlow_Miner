@@ -16,13 +16,15 @@ initialize_session_state()
 col1, col2 = st.columns(2)
 
 with col1:
-    disabled = get_log_eventos() is not None # Desabilitar se já houver um arquivo carregado
+    # Pré-computar na linha abaixo para não precisar chamar get_log_eventos() duas vezes
+    disabled = (load_info := get_log_eventos(which="load_info")) is not None # Desabilitar se já houver um arquivo carregado
     col1.button("Carregar", on_click=open_input_dialog, type="primary", disabled=disabled)
     if st.session_state.input_dialog:
         input_dataset()
 
 with col2:
-    if (load_info := get_log_eventos(which="load_info")) is not None:
+    # load_info já foi pré-computado acima
+    if load_info is not None:
         st.text(f"Usando o arquivo: {load_info['file_name']}")
     else:
         st.text("Nenhum arquivo carregado.")
@@ -30,7 +32,7 @@ with col2:
 model_names = list(st.session_state.process_models.names)
 
 selected_index = 0
-current_selected = get_selected_model()
+current_selected = get_selected_model() # Computamos o nome do modelo selecionado ou None aqui
 if current_selected is not None:
     try:
         selected_index = model_names.index(current_selected)
@@ -46,10 +48,10 @@ st.selectbox(
 )
 
 if disabled:
-    if get_selected_model() is None:
+    if current_selected is None:
         # Exibe interface de filtros para criar novo
         filter_section()
     else:
         # Exibe modelo salvo selecionado
-        render_saved_model_ui(get_selected_model())
+        render_saved_model_ui(current_selected)
         
