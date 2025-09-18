@@ -20,11 +20,6 @@ col1, col2 = st.columns(2)
 # Seletor de modelos de processos: placeholder seguido dos nomes salvos
 placeholder = "Criar novo modelo de processo..."
 model_names = list(st.session_state.process_models.names)
-if not model_names or model_names[0] != placeholder:
-    # Garantir placeholder na primeira posição quando vazio
-    if len(model_names) == 0:
-        st.session_state.process_models.add(placeholder, None)
-        model_names = [placeholder]
 
 selected_index = 0
 current_selected = get_selected_model()
@@ -42,12 +37,6 @@ selected_name = st.selectbox(
     placeholder=None,
 )
 
-# Sincroniza seleção no estado
-if selected_name == placeholder:
-    set_selected_model(None)
-else:
-    set_selected_model(selected_name)
-
 with col1:
     col1.button("Carregar", on_click=open_input_dialog)
     if st.session_state.input_dialog:
@@ -58,6 +47,13 @@ with col2:
         st.text(f"Usando o arquivo: {load_info['file_name']}")
     else:
         st.text("Nenhum arquivo carregado.")
+
+
+# Sincroniza seleção no estado
+if selected_name == placeholder:
+    set_selected_model(None)
+else:
+    set_selected_model(selected_name)
 
 if get_log_eventos() is not None:
     if get_selected_model() is None:
