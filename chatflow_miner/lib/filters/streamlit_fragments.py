@@ -45,8 +45,8 @@ def filter_section(*, disabled: bool = False):
         if st.button("Gerar", key="filters.generate", disabled=disabled):
             try:
                 with st.spinner("Gerando modelo..."):
-                    model_data = generate_process_model(event_log_view)
-                    st.session_state.latest_generated_model = model_data
+                    view = generate_process_model(event_log_view)
+                    st.session_state.latest_generated_model = view
                 # Abre diálogo para visualização e salvamento
                 show_generated_model_dialog()
             except ValueError as exc:
