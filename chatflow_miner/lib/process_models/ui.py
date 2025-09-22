@@ -110,7 +110,7 @@ def show_generated_model_dialog() -> None:
                 st.error("Ocorreu um erro ao salvar o modelo. Verifique o nome e tente novamente.")
                 st.exception(exc)
 
-
+@st.fragment
 def render_saved_model_ui(selected_name: str) -> None:
     """Renderiza o modelo salvo na área principal, substituindo a UI de filtros."""
     from ..state.manager import get_process_model  # import local para evitar ciclos
@@ -120,9 +120,26 @@ def render_saved_model_ui(selected_name: str) -> None:
         st.error("Modelo selecionado não encontrado.")
         return
 
+    options = ["Horizontal", "Vertical"]
+    rankdir = st.segmented_control(
+        "Orientação do grafo",
+        options,
+        selection_mode="single",
+        default=options[0],
+    )
+
     try:
-        gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
-        st.graphviz_chart(gviz, width="stretch")
+        # gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
+        # st.graphviz_chart(gviz, width="stretch")
+        match rankdir:
+            case "Horizontal":
+                gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
+                st.graphviz_chart(gviz, width="stretch")
+            case "Vertical":
+                gviz = view.to_graphviz(bgcolor="white", rankdir="TB")
+                st.graphviz_chart(gviz, width="stretch")
+            case _:
+                st.error("Você deve selecionar uma orientação para o modelo.")
     except Exception as exc:
         st.error("Falha ao renderizar o modelo salvo.")
         st.exception(exc)
