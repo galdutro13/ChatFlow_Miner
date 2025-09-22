@@ -3,7 +3,7 @@ import pandas as pd
 
 from chatflow_miner.lib.state import get_log_eventos
 from chatflow_miner.lib.filters.builtins import AgentFilter
-from chatflow_miner.lib.filters.view import EventLogView
+from chatflow_miner.lib.event_log.view import EventLogView
 from chatflow_miner.lib.process_models.ui import (
     generate_process_model,
     show_generated_model_dialog,
@@ -14,7 +14,7 @@ from chatflow_miner.lib.process_models.ui import (
 def filter_section(*, disabled: bool = False):
     """Fragmento reutilizável para seção de filtros em Streamlit."""
     st.write("Filtro de dados - Em construção")
-    options = ["ai", "human", "ambos"]
+    options = ["chatbot", "cliente", "ambos"]
     filter_selection = st.segmented_control(
         "Filtro de AGENTE",
         options,
@@ -29,10 +29,10 @@ def filter_section(*, disabled: bool = False):
     event_log_view = EventLogView(base_df=base_df)
 
     match filter_selection:
-        case "ai":
+        case "chatbot":
             agent_filter = AgentFilter(agent="ai")
             event_log_view = event_log_view.filter(agent_filter)
-        case "human":
+        case "cliente":
             agent_filter = AgentFilter(agent="human")
             event_log_view = event_log_view.filter(agent_filter)
         case "ambos":
@@ -45,8 +45,8 @@ def filter_section(*, disabled: bool = False):
         if st.button("Gerar", key="filters.generate", disabled=disabled):
             try:
                 with st.spinner("Gerando modelo..."):
-                    model_data = generate_process_model(event_log_view)
-                    st.session_state.latest_generated_model = model_data
+                    view = generate_process_model(event_log_view)
+                    st.session_state.latest_generated_model = view
                 # Abre diálogo para visualização e salvamento
                 show_generated_model_dialog()
             except ValueError as exc:

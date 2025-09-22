@@ -5,7 +5,7 @@ from typing import Sequence, List, Any, Union
 from collections.abc import Iterable
 import pandas as pd
 
-from .base import BaseFilter, _ensure_bool_series
+from ..filters.base import BaseFilter, _ensure_bool_series
 from ..constants import COLUMN_CASE_ID
 # -----------------------------------------------------------------------------
 # EventLogView: visão lazy sobre o DataFrame
@@ -56,28 +56,3 @@ class EventLogView:
     # Conveniências com materialização
     def head(self, n: int = 5) -> pd.DataFrame:
         return self.compute().head(n)
-
-    def to_csv(self, path: str, **kwargs: Any) -> None:
-        self.compute().to_csv(path, index=False, **kwargs)
-
-    def to_xes(self, path: str, case_id_col: str = COLUMN_CASE_ID) -> None:
-        """Exporta o resultado para XES usando ``pm4py`` (opcional).
-
-        Esta função importa ``pm4py`` sob demanda para não introduzir dependência
-        forte. Lança ``ImportError`` se o pacote não estiver disponível.
-        """
-        try:
-            from pm4py.objects.log.util import dataframe_utils
-            from pm4py.objects.conversion.log import converter as log_converter
-        except Exception as exc:  # pragma: no cover - caminho de fallback
-            raise ImportError(
-                "Exportação XES requer 'pm4py' instalado"
-            ) from exc
-
-        df = self.compute()
-        df = dataframe_utils.convert_timestamp_columns_in_df(df)
-        params = {log_converter.Variants.TO_EVENT_LOG.value.Parameters.CASE_ID_KEY: case_id_col}
-        event_log = log_converter.apply(df, variant=log_converter.Variants.TO_EVENT_LOG, parameters=params)
-
-        from pm4py.objects.log.exporter.xes import exporter as xes_exporter
-        xes_exporter.apply(event_log, path)

@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Tuple
-
-import pandas as pd
+from typing import Iterable
 import streamlit as st
 
 from .dfg import DFGModel
 from .view import ProcessModelView
-from ..filters.view import EventLogView
+from ..event_log.view import EventLogView
 from ..state.manager import set_selected_model
 
 
@@ -37,59 +34,30 @@ def name_is_unique(name: str, existing: Iterable[str]) -> bool:
 # Model generation and render
 # -----------------------------
 
-def generate_process_model(log_view: EventLogView) -> Dict[str, Any]:
-    """Gera dados essenciais do modelo de processo a partir de um EventLogView.
+def generate_process_model(log_view: EventLogView) -> ProcessModelView:
+    """Gera um ProcessModelView a partir de um EventLogView.
 
-    Retorna apenas dados essenciais (sem objetos pesados/visualizações).
-    Estrutura retornada:
-      { 'type': 'dfg', 'data': (dfg, start_acts, end_acts) }
+    Retorna uma ProcessModelView que combina o log_view com um DFGModel.
+    O modelo será computado lazy quando necessário.
     """
-    df = log_view.compute()
     model = DFGModel()
-    dfg_tuple = model.compute(df)
-    return {"type": "dfg", "data": dfg_tuple}
+    return ProcessModelView(log_view=log_view, model=model)
 
 
-def render_process_graph(model_data: Dict[str, Any]) -> None:
-    """Renderiza o grafo do modelo a partir de `model_data` exclusivamente.
+def render_process_graph(view: ProcessModelView) -> None:
+    """Renderiza o grafo do modelo a partir de uma ProcessModelView.
 
-    Não acessa globais; apenas `model_data` é usado.
+    Usa o método to_graphviz() da view para gerar a visualização.
     """
-    if model_data.get("type") == "dfg":
-        dfg_tuple = model_data["data"]
-        gviz = DFGModel().to_graphviz(dfg_tuple, bgcolor="white", rankdir="LR")
-        st.graphviz_chart(gviz, width="stretch")
-    else:
-        st.warning("Tipo de modelo desconhecido para visualização.")
+    gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
+    st.graphviz_chart(gviz, width="stretch")
 
 
 # -----------------------------
 # Persistência em session_state
 # -----------------------------
 
-@dataclass
-class _DFGPrecomputedModel(DFGModel):
-    """Modelo DFG que ignora DF e entrega dados pré-computados.
-
-    Usado para armazenar somente dados essenciais no registry sem reter DataFrames.
-    """
-    precomputed: Tuple[dict, dict, dict]
-
-    def compute(self, df: pd.DataFrame) -> Tuple[dict, dict, dict]:  # type: ignore[override]
-        return self.precomputed
-
-
-def _build_view_from_model_data(model_data: Dict[str, Any]) -> ProcessModelView:
-    if model_data.get("type") == "dfg":
-        pre = model_data["data"]
-        model = _DFGPrecomputedModel(precomputed=pre)
-        # DataFrame vazio apenas para satisfazer a assinatura; o modelo ignora.
-        empty_df = pd.DataFrame()
-        return ProcessModelView(log_view=empty_df, model=model)
-    raise ValueError("Tipo de modelo não suportado para persistência.")
-
-
-def save_model(name: str, model_data: Dict[str, Any]) -> None:
+def save_model(name: str, view: ProcessModelView) -> None:
     """Salva o modelo no registry, atualiza seleção e fecha o diálogo.
 
     Regras:
@@ -108,7 +76,6 @@ def save_model(name: str, model_data: Dict[str, Any]) -> None:
     if not name_is_unique(name, existing_names):
         raise ValueError("Já existe um modelo com este nome. Escolha outro nome.")
 
-    view = _build_view_from_model_data(model_data)
     st.session_state.process_models.add(name, view)
     set_selected_model(name)
 
@@ -123,12 +90,12 @@ def save_model(name: str, model_data: Dict[str, Any]) -> None:
 @st.dialog("Modelo de processos gerado com sucesso", dismissible=True)
 def show_generated_model_dialog() -> None:
     """Dialogo para exibir a visualização e permitir salvar com um nome."""
-    model_data = st.session_state.get("latest_generated_model")
-    if model_data is None:
+    model_view = st.session_state.get("latest_generated_model")
+    if model_view is None:
         st.info("Nenhum modelo gerado nesta execução.")
         return
 
-    render_process_graph(model_data)
+    render_process_graph(model_view)
 
     with st.form(key="dialog.form.save"):
         name = st.text_input("Nome do modelo", key="dialog.name")
@@ -136,14 +103,14 @@ def show_generated_model_dialog() -> None:
         if submitted:
             try:
                 with st.spinner("Salvando modelo..."):
-                    save_model(name, model_data)
+                    save_model(name, model_view)
             except ValueError as exc:
                 st.error(str(exc))
             except Exception as exc:
                 st.error("Ocorreu um erro ao salvar o modelo. Verifique o nome e tente novamente.")
                 st.exception(exc)
 
-
+@st.fragment
 def render_saved_model_ui(selected_name: str) -> None:
     """Renderiza o modelo salvo na área principal, substituindo a UI de filtros."""
     from ..state.manager import get_process_model  # import local para evitar ciclos
@@ -153,9 +120,26 @@ def render_saved_model_ui(selected_name: str) -> None:
         st.error("Modelo selecionado não encontrado.")
         return
 
+    options = ["Horizontal", "Vertical"]
+    rankdir = st.segmented_control(
+        "Orientação do grafo",
+        options,
+        selection_mode="single",
+        default=options[0],
+    )
+
     try:
-        gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
-        st.graphviz_chart(gviz, width="stretch")
+        # gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
+        # st.graphviz_chart(gviz, width="stretch")
+        match rankdir:
+            case "Horizontal":
+                gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
+                st.graphviz_chart(gviz, width="stretch")
+            case "Vertical":
+                gviz = view.to_graphviz(bgcolor="white", rankdir="TB")
+                st.graphviz_chart(gviz, width="stretch")
+            case _:
+                st.error("Você deve selecionar uma orientação para o modelo.")
     except Exception as exc:
         st.error("Falha ao renderizar o modelo salvo.")
         st.exception(exc)

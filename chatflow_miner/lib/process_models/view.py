@@ -5,7 +5,7 @@ from typing import Any, Optional
 import pandas as pd
 
 from .base import BaseProcessModel
-from ..filters.view import EventLogView
+from ..event_log.view import EventLogView
 
 @dataclass
 class ProcessModelView:
