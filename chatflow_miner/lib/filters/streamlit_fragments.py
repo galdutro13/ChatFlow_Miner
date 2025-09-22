@@ -14,7 +14,7 @@ from chatflow_miner.lib.process_models.ui import (
 def filter_section(*, disabled: bool = False):
     """Fragmento reutilizável para seção de filtros em Streamlit."""
     st.write("Filtro de dados - Em construção")
-    options = ["ai", "human", "ambos"]
+    options = ["chatbot", "cliente", "ambos"]
     filter_selection = st.segmented_control(
         "Filtro de AGENTE",
         options,
@@ -29,10 +29,10 @@ def filter_section(*, disabled: bool = False):
     event_log_view = EventLogView(base_df=base_df)
 
     match filter_selection:
-        case "ai":
+        case "chatbot":
             agent_filter = AgentFilter(agent="ai")
             event_log_view = event_log_view.filter(agent_filter)
-        case "human":
+        case "cliente":
             agent_filter = AgentFilter(agent="human")
             event_log_view = event_log_view.filter(agent_filter)
         case "ambos":
