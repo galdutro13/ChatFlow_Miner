@@ -3,8 +3,9 @@ import pandas as pd
 import streamlit as st
 
 from chatflow_miner.lib.process_models import ProcessModelRegistry, ProcessModelView, DFGModel
-from chatflow_miner.lib.filters import EventLogView
+from chatflow_miner.lib.filters.view import EventLogView
 
+PLACEHOLDER = "Criar novo modelo de processo..."
 
 def initialize_session_state() -> None:
     """
@@ -28,9 +29,29 @@ def initialize_session_state() -> None:
     if "load_info" not in st.session_state:
         st.session_state.load_info = None
     if "process_models" not in st.session_state:
-        # process models deve ser um dicionário nome -> modelo
+        # Registry de modelos de processo (mapping nome -> ProcessModelView | None)
         st.session_state.process_models = ProcessModelRegistry()
         initialize_process_models()
+
+    # Seleção atual no seletor de modelos
+    if "selected_model" not in st.session_state:
+        st.session_state.selected_model = PLACEHOLDER
+
+    # Último modelo gerado (não persistido) para exibição no diálogo
+    if "latest_generated_model" not in st.session_state:
+        st.session_state.latest_generated_model = None
+
+
+def get_selected_model() -> Optional[str]:
+    """Retorna o nome do modelo de processo selecionado (ou None)."""
+    if st.session_state.selected_model != PLACEHOLDER:
+        return st.session_state.get("selected_model")
+    return None
+
+
+def set_selected_model(name: Optional[str]) -> None:
+    """Define o nome do modelo de processo selecionado (ou None para voltar à criação)."""
+    st.session_state.selected_model = name
 
 
 def initialize_process_models() -> None:
@@ -40,10 +61,10 @@ def initialize_process_models() -> None:
     """
     if "process_models" not in st.session_state:
         st.session_state.process_models = ProcessModelRegistry()
-    
+
     # Adiciona o placeholder apenas se o registry estiver vazio
     if len(st.session_state.process_models) == 0:
-        st.session_state.process_models.add("Criar novo modelo de processo...")
+        st.session_state.process_models.add(PLACEHOLDER)
 
 
 def open_input_dialog() -> None:

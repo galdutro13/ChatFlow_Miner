@@ -7,7 +7,9 @@ from .manager import (initialize_session_state,
                       add_process_model,
                       remove_process_model,
                       get_process_model,
-                      list_process_models)
+                      list_process_models,
+                      get_selected_model,
+                      set_selected_model)
 
 __all__ = ["initialize_session_state",
            "open_input_dialog",
@@ -18,4 +20,6 @@ __all__ = ["initialize_session_state",
            "add_process_model",
            "remove_process_model",
            "get_process_model",
-           "list_process_models"]
+           "list_process_models",
+           "get_selected_model",
+           "set_selected_model"]

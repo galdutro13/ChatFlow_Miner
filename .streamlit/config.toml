@@ -1,0 +1,6 @@
+[global]
+disableWidgetStateDuplicationWarning = true
+
+[theme]
+backgroundColor = "white"
+
