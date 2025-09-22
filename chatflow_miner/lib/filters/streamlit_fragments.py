@@ -3,7 +3,7 @@ import pandas as pd
 
 from chatflow_miner.lib.state import get_log_eventos
 from chatflow_miner.lib.filters.builtins import AgentFilter
-from chatflow_miner.lib.filters.view import EventLogView
+from chatflow_miner.lib.event_log.view import EventLogView
 from chatflow_miner.lib.process_models.ui import (
     generate_process_model,
     show_generated_model_dialog,

@@ -1,7 +1,7 @@
 import pandas as pd
 from pathlib import Path
 
-from chatflow_miner.lib.filters.view import EventLogView
+from chatflow_miner.lib.event_log.view import EventLogView
 from chatflow_miner.lib.filters.builtins import AgentFilter, TimeWindowFilter
 
 

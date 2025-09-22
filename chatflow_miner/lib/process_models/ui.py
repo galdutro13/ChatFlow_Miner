@@ -5,7 +5,7 @@ import streamlit as st
 
 from .dfg import DFGModel
 from .view import ProcessModelView
-from ..filters.view import EventLogView
+from ..event_log.view import EventLogView
 from ..state.manager import set_selected_model
 
 
