@@ -14,6 +14,11 @@ from chatflow_miner.lib.process_models.ui import render_saved_model_ui
 st.set_page_config(page_title="ChatFlow Miner", layout="wide")
 initialize_session_state()
 
+st.sidebar.title("ChatFlow Miner")
+st.sidebar.write("Descoberta de modelo de processo")
+st.sidebar.write("Análise exploratória")
+st.sidebar.write("Análise de agentes")
+
 col1, col2 = st.columns(2)
 
 with col1:
