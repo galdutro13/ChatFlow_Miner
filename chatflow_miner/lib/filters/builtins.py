@@ -1,10 +1,9 @@
-from typing import Any
+from typing import Any, Sequence
 
 import pandas as pd
 
 from .base import BaseFilter
 from ..constants import *
-
 # -----------------------------------------------------------------------------
 # Filtros concretos (exemplos úteis para mineração de processos)
 # -----------------------------------------------------------------------------
@@ -107,3 +106,16 @@ class TimeWindowFilter(BaseFilter):
             else:
                 m &= st <= self.end
         return m.fillna(False)
+
+class CaseFilter(BaseFilter):
+    """
+    Mantém **todos** os eventos dos *cases* cujo ID está na lista fornecida.
+    """
+    required_columns = (COLUMN_CASE_ID,)
+
+    def __init__(self, case_ids: Sequence[str]) -> None:
+        self.case_ids = set(case_ids)
+
+    def mask(self, df: pd.DataFrame) -> pd.Series:
+        self._check_columns(df)
+        return df[COLUMN_CASE_ID].isin(self.case_ids)

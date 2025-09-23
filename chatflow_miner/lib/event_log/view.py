@@ -56,3 +56,14 @@ class EventLogView:
     # Conveniências com materialização
     def head(self, n: int = 5) -> pd.DataFrame:
         return self.compute().head(n)
+
+    def to_csv(self, path: str, *, index: bool = False, **kwargs: Any) -> None:
+        """Materializa a view e persiste o resultado em CSV.
+
+        Args:
+            path: Caminho do arquivo de saída.
+            index: Define se o índice do DataFrame deve ser escrito (default: False).
+            **kwargs: Argumentos adicionais repassados para ``DataFrame.to_csv``.
+        """
+
+        self.compute().to_csv(path, index=index, **kwargs)
