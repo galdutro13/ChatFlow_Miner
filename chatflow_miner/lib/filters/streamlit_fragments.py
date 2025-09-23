@@ -76,27 +76,11 @@ def filter_by_agents(disabled: bool) -> EventLogView:
     Retorna:
         EventLogView: Um EventLogView filtrado pelo agente selecionado ('chatbot', 'cliente' ou 'ambos').
     """
-    options = ["chatbot", "cliente", "ambos"]
-    filter_selection = st.segmented_control(
-        "Filtro de AGENTE",
-        options,
-        selection_mode="single",
-        default=options[2],
-        disabled=disabled,
-    )
+    sel = st.segmented_control(
+        "Filtro de AGENTE", ["chatbot", "cliente", "ambos"],
+        selection_mode="single", default="ambos", disabled=disabled)
+    df = (d if (d := get_log_eventos(which="log_eventos")) is not None else pd.DataFrame())
+    view = EventLogView(base_df=df)
+    agent = {"chatbot": "ai", "cliente": "human"}.get(sel)
+    return view.filter(AgentFilter(agent=agent)) if agent else view
 
-    base_df = get_log_eventos(which="log_eventos")
-    if base_df is None:
-        base_df = pd.DataFrame()
-    event_log_view = EventLogView(base_df=base_df)
-
-    match filter_selection:
-        case "chatbot":
-            agent_filter = AgentFilter(agent="ai")
-            event_log_view = event_log_view.filter(agent_filter)
-        case "cliente":
-            agent_filter = AgentFilter(agent="human")
-            event_log_view = event_log_view.filter(agent_filter)
-        case "ambos":
-            pass
-    return event_log_view
