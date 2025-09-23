@@ -37,6 +37,16 @@ def filter_section(*, disabled: bool = False):
 
 
 def filter_by_variants(event_view: EventLogView, disabled: bool):
+    """
+    Exibe e aplica um filtro de variantes de casos sobre um EventLogView usando Streamlit.
+
+    Parâmetros:
+        event_view (EventLogView): A visão do log de eventos a ser filtrada.
+        disabled (bool): Se True, desabilita a interação do filtro na interface.
+
+    Retorna:
+        EventLogView ou None: Um novo EventLogView filtrado pelas variantes selecionadas, ou None se não houver dados.
+    """
     df = get_log_eventos(which="log_eventos")
     if df is None:
         st.multiselect("Filtro de VARIANTE", [], [], disabled=disabled); return None
@@ -57,6 +67,15 @@ def filter_by_variants(event_view: EventLogView, disabled: bool):
 
 
 def filter_by_agents(disabled: bool) -> EventLogView:
+    """
+    Exibe e aplica um filtro de agente sobre o EventLogView usando Streamlit.
+
+    Parâmetros:
+        disabled (bool): Se True, desabilita a interação do filtro na interface.
+
+    Retorna:
+        EventLogView: Um EventLogView filtrado pelo agente selecionado ('chatbot', 'cliente' ou 'ambos').
+    """
     options = ["chatbot", "cliente", "ambos"]
     filter_selection = st.segmented_control(
         "Filtro de AGENTE",
@@ -81,4 +100,3 @@ def filter_by_agents(disabled: bool) -> EventLogView:
         case "ambos":
             pass
     return event_log_view
-
