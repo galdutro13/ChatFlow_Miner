@@ -36,46 +36,22 @@ def filter_section(*, disabled: bool = False):
                 st.exception(exc)
 
 
-def filter_by_variants(event_view: EventLogView,  disabled: bool):
-    base_df = get_log_eventos(which="log_eventos")
-    if base_df is None:
-        st.multiselect(
-            "Filtro de VARIANTE",
-            options=[],
-            default=[],
-            disabled=disabled
-        )
-        return None
-
-    var_agg = CaseAggView(base_df=base_df).with_aggregator(CaseVariantAggregator())
-    result = var_agg.compute()
+def filter_by_variants(event_view: EventLogView, disabled: bool):
+    df = get_log_eventos(which="log_eventos")
+    if df is None:
+        st.multiselect("Filtro de VARIANTE", [], [], disabled=disabled); return None
+    result = CaseAggView(base_df=df).with_aggregator(CaseVariantAggregator()).compute()
+    gid = lambda k: getattr(result[k], "variant_id", k)
     seen = set()
-    variants = [v for v in result if (vid := getattr(result[v], "variant_id", v)) not in seen and not seen.add(vid)]
-
-    # Reordenar a lista com base em frequência decrescente
+    variants = [v for v in result if (vid := gid(v)) not in seen and not seen.add(vid)]
     variants.sort(key=lambda v: result[v].frequency, reverse=True)
-
-    filter_selection = st.multiselect(
-        "Filtro de VARIANTE",
-        options=variants,
-        default=[],
-        format_func=lambda variant: f"freq={result[variant].frequency} | {result[variant].variant_id} | {result[variant].variant}",
-        disabled=disabled,
-    )
-
-    if filter_selection:
-        # coletar os variant_id das variantes selecionadas
-        selected_variant_ids = {getattr(result[v], "variant_id", v) for v in filter_selection}
-        # obter os case_ids cujas variantes têm variant_id selecionado
-        case_ids = [
-            case_id
-            for case_id in result
-            if getattr(result[case_id], "variant_id", case_id) in selected_variant_ids
-        ]
-        if case_ids:
-            case_filter = CaseFilter(case_ids=case_ids)
-            return event_view.filter(case_filter)
-
+    fmt = lambda v: f"freq={result[v].frequency} | {result[v].variant_id} | " \
+                    f"{result[v].variant}"
+    selected = st.multiselect("Filtro de VARIANTE", variants, [], format_func=fmt,
+                              disabled=disabled)
+    if selected:
+        cid = {gid(v) for v in selected}; ks = [k for k in result if gid(k) in cid]
+        if ks: return event_view.filter(CaseFilter(case_ids=ks))
     return event_view
 
 
