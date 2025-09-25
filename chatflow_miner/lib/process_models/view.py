@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import numbers
 from typing import Any, Optional
 import pandas as pd
 
@@ -20,6 +21,9 @@ class ProcessModelView:
     model: BaseProcessModel
     _cached: Optional[Any] = field(default=None, init=False, repr=False)
     _cached_graphviz: dict = field(default_factory=dict, init=False, repr=False)
+    _cached_quality: dict[str, float | None] | None = field(
+        default=None, init=False, repr=False
+    )
 
     def compute(self) -> Any:
         """
@@ -46,6 +50,7 @@ class ProcessModelView:
         self._cached = result
         # Limpa cache de visualizações quando o resultado muda
         self._cached_graphviz.clear()
+        self._cached_quality = None
         return result
 
     def to_graphviz(self, **kwargs: Any) -> Any:
@@ -67,3 +72,44 @@ class ProcessModelView:
         viz = self.model.to_graphviz(result, **kwargs)
         self._cached_graphviz[cache_key] = viz
         return viz
+
+    def quality_metrics(self) -> dict[str, float | None]:
+        """Calcula e retorna métricas de qualidade do modelo."""
+
+        if self._cached_quality is not None:
+            return self._cached_quality
+
+        if isinstance(self.log_view, EventLogView):
+            df = self.log_view.compute()
+        elif isinstance(self.log_view, pd.DataFrame):
+            df = self.log_view
+        else:
+            raise TypeError(
+                "log_view deve ser um EventLogView ou pandas.DataFrame"
+            )
+
+        result = self.compute()
+
+        quality_fn = getattr(self.model, "quality_metrics", None)
+        if quality_fn is None:
+            raise NotImplementedError(
+                f"{type(self.model).__name__} não implementa métricas de qualidade."
+            )
+
+        metrics_mapping = quality_fn(df, result)
+        metrics_dict = dict(metrics_mapping)
+
+        sanitized: dict[str, float | None] = {}
+        for raw_key, value in metrics_dict.items():
+            key = str(raw_key)
+            if value is None:
+                sanitized[key] = None
+            elif isinstance(value, numbers.Number):
+                sanitized[key] = float(value)
+            else:
+                raise TypeError(
+                    "Os valores das métricas devem ser números ou None."
+                )
+
+        self._cached_quality = sanitized
+        return sanitized

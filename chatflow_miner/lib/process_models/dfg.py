@@ -1,9 +1,16 @@
-from typing import Any, Tuple
+from typing import Any, Dict, Tuple
+import math
+import logging
+
 import pandas as pd
 import pm4py
 from graphviz import Digraph
 
 from .base import BaseProcessModel
+
+
+LOGGER = logging.getLogger(__name__)
+
 
 class DFGModel(BaseProcessModel):
     """
@@ -51,3 +58,122 @@ class DFGModel(BaseProcessModel):
                                     parameters=parameters)
 
         return gviz
+
+    def quality_metrics(
+        self,
+        df: pd.DataFrame,
+        model: Tuple[dict, dict, dict],
+    ) -> Dict[str, float | None]:
+        """Calcula métricas de qualidade para o DFG convertido em rede de Petri.
+
+        Args:
+            df: DataFrame do log de eventos (formato pm4py).
+            model: Tupla ``(dfg, start_activities, end_activities)`` retornada por
+                :meth:`compute`.
+
+        Returns:
+            Dicionário com as métricas ``fitness``, ``precision``,
+            ``generalization`` e ``simplicity``. Valores ``None`` indicam que a
+            métrica não pôde ser calculada.
+        """
+
+        metrics: Dict[str, float | None] = {
+            "fitness": None,
+            "precision": None,
+            "generalization": None,
+            "simplicity": None,
+        }
+
+        dfg_graph, start_activities, end_activities = model
+
+        try:
+            from pm4py.objects.conversion.dfg import converter as dfg_converter
+            from pm4py.objects.conversion.dfg.variants import (
+                to_petri_net_activity_defines_place as dfg_to_petri,
+            )
+
+            parameters = {
+                dfg_to_petri.Parameters.START_ACTIVITIES: start_activities,
+                dfg_to_petri.Parameters.END_ACTIVITIES: end_activities,
+            }
+            net, initial_marking, final_marking = dfg_converter.apply(
+                dfg_graph, parameters=parameters
+            )
+        except Exception:  # pragma: no cover - logged and handled by returning defaults
+            LOGGER.exception("Falha ao converter DFG para rede de Petri para métricas")
+            return metrics
+
+        from pm4py.algo.evaluation.replay_fitness import (
+            algorithm as replay_fitness_algorithm,
+        )
+        from pm4py.algo.evaluation.precision import algorithm as precision_algorithm
+        from pm4py.algo.evaluation.generalization import (
+            algorithm as generalization_algorithm,
+        )
+        from pm4py.algo.evaluation.simplicity import (
+            algorithm as simplicity_algorithm,
+        )
+        from pm4py.util import constants as pm_constants
+        from pm4py.util import xes_constants
+
+        eval_params = {
+            pm_constants.PARAMETER_CONSTANT_ACTIVITY_KEY: xes_constants.DEFAULT_NAME_KEY,
+        }
+
+        def _safe_number(value: Any) -> float | None:
+            try:
+                num = float(value)
+            except (TypeError, ValueError):
+                return None
+            if math.isnan(num) or math.isinf(num):
+                return None
+            return num
+
+        if not df.empty:
+            try:
+                fitness_res = replay_fitness_algorithm.apply(
+                    df,
+                    net,
+                    initial_marking,
+                    final_marking,
+                    parameters=eval_params,
+                )
+                fitness_val = fitness_res.get("log_fitness")
+                if fitness_val is None:
+                    fitness_val = fitness_res.get("average_trace_fitness")
+                metrics["fitness"] = _safe_number(fitness_val)
+            except Exception:
+                LOGGER.exception("Falha ao calcular fitness do modelo DFG")
+
+            try:
+                precision_val = precision_algorithm.apply(
+                    df,
+                    net,
+                    initial_marking,
+                    final_marking,
+                    parameters=eval_params,
+                )
+                metrics["precision"] = _safe_number(precision_val)
+            except Exception:
+                LOGGER.exception("Falha ao calcular precision do modelo DFG")
+
+            try:
+                generalization_val = generalization_algorithm.apply(
+                    df,
+                    net,
+                    initial_marking,
+                    final_marking,
+                    parameters=eval_params,
+                )
+                metrics["generalization"] = _safe_number(generalization_val)
+            except Exception:
+                LOGGER.exception("Falha ao calcular generalization do modelo DFG")
+
+        try:
+            simplicity_val = simplicity_algorithm.apply(net)
+            metrics["simplicity"] = _safe_number(simplicity_val)
+        except Exception:
+            LOGGER.exception("Falha ao calcular simplicity do modelo DFG")
+
+        return metrics
+

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 from typing import Iterable
+import logging
+
+import pandas as pd
 import streamlit as st
 
 from .dfg import DFGModel
 from .view import ProcessModelView
 from ..event_log.view import EventLogView
 from ..state.manager import set_selected_model
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 # -----------------------------
@@ -129,8 +135,6 @@ def render_saved_model_ui(selected_name: str) -> None:
     )
 
     try:
-        # gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
-        # st.graphviz_chart(gviz, width="stretch")
         match rankdir:
             case "Horizontal":
                 gviz = view.to_graphviz(bgcolor="white", rankdir="LR")
@@ -143,5 +147,37 @@ def render_saved_model_ui(selected_name: str) -> None:
     except Exception as exc:
         st.error("Falha ao renderizar o modelo salvo.")
         st.exception(exc)
+
+    st.divider()
+    st.subheader("Métricas de qualidade do modelo")
+
+    try:
+        with st.spinner("Calculando métricas..."):
+            metrics = view.quality_metrics()
+    except NotImplementedError:
+        st.info("Métricas de qualidade não disponíveis para este tipo de modelo.")
+        return
+    except Exception:
+        st.warning("Não foi possível calcular as métricas de qualidade do modelo.")
+        LOGGER.exception("Falha ao calcular métricas de qualidade para o modelo '%s'", selected_name)
+        return
+
+    rows = []
+    ordered_keys = [
+        ("fitness", "Fitness"),
+        ("precision", "Precisão"),
+        ("generalization", "Generalização"),
+        ("simplicity", "Simplicidade"),
+    ]
+    for key, label in ordered_keys:
+        value = metrics.get(key)
+        if isinstance(value, (int, float)):
+            display = f"{value:.3f}"
+        else:
+            display = "N/A"
+        rows.append({"Métrica": label, "Valor": display})
+
+    metrics_df = pd.DataFrame(rows).set_index("Métrica")
+    st.table(metrics_df)
 
 

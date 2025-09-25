@@ -13,9 +13,10 @@ from chatflow_miner.lib.aggregations import CaseVariantAggregator, CaseAggView
 @st.fragment
 def filter_section(*, disabled: bool = False):
     """Fragmento reutilizável para seção de filtros em Streamlit."""
-    st.write("Filtro de dados - Em construção")
+    st.markdown("Filtro de dados - <u>Em construção</u>", unsafe_allow_html=True)
     event_log_view = filter_by_agents(disabled)
     event_log_view = filter_by_variants(event_log_view, disabled) or event_log_view
+    temporal_filter()
 
     st.dataframe(event_log_view.compute())
 
@@ -84,3 +85,6 @@ def filter_by_agents(disabled: bool) -> EventLogView:
     agent = {"chatbot": "ai", "cliente": "human"}.get(sel)
     return view.filter(AgentFilter(agent=agent)) if agent else view
 
+def temporal_filter():
+    st.markdown("Filtro temporal - <u>Em construção</u>", unsafe_allow_html=True)
+    st.info("Filtro temporal ainda não implementado.")

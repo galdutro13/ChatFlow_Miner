@@ -1,0 +1,62 @@
+import pandas as pd
+import pm4py
+import sys
+import importlib
+
+
+def _sample_log_df() -> pd.DataFrame:
+    base = pd.Timestamp("2024-01-01 00:00:00")
+    data = {
+        "CASE_ID": ["c1", "c1", "c1", "c2", "c2"],
+        "EVENT_ID": [1, 2, 3, 4, 5],
+        "ACTIVITY": ["Start", "Chat", "End", "Start", "End"],
+        "START_TIMESTAMP": [
+            base,
+            base + pd.Timedelta(minutes=1),
+            base + pd.Timedelta(minutes=2),
+            base + pd.Timedelta(minutes=3),
+            base + pd.Timedelta(minutes=4),
+        ],
+        "END_TIMESTAMP": [
+            base + pd.Timedelta(seconds=30),
+            base + pd.Timedelta(minutes=1, seconds=30),
+            base + pd.Timedelta(minutes=2, seconds=30),
+            base + pd.Timedelta(minutes=3, seconds=30),
+            base + pd.Timedelta(minutes=4, seconds=30),
+        ],
+    }
+    df = pd.DataFrame(data)
+    formatted = pm4py.format_dataframe(
+        df,
+        case_id="CASE_ID",
+        activity_key="ACTIVITY",
+        timestamp_key="END_TIMESTAMP",
+        start_timestamp_key="START_TIMESTAMP",
+    )
+    return formatted
+
+
+def test_quality_metrics_are_computed_and_cached():
+    df = _sample_log_df()
+    from chatflow_miner.lib.event_log.view import EventLogView
+    from chatflow_miner.lib.process_models.view import ProcessModelView
+    from chatflow_miner.lib.process_models.dfg import DFGModel
+
+    log_view = EventLogView(df)
+    view = ProcessModelView(log_view=log_view, model=DFGModel())
+
+    metrics = view.quality_metrics()
+
+    expected_keys = {"fitness", "precision", "generalization", "simplicity"}
+    assert expected_keys.issubset(metrics.keys())
+
+    for key in expected_keys:
+        value = metrics[key]
+        assert value is None or isinstance(value, float)
+
+    cached_metrics = view.quality_metrics()
+    assert cached_metrics is metrics
+
+    # Limpa o módulo para que testes que usam stubs consigam reimportar com monkeypatch
+    sys.modules.pop("chatflow_miner.lib.process_models.dfg", None)
+    importlib.invalidate_caches()
