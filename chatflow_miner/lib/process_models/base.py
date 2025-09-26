@@ -40,3 +40,22 @@ class BaseProcessModel:
         raise NotImplementedError(
             "Este modelo não implementa visualização Graphviz"
         )
+
+    def quality_metrics(
+        self, df: pd.DataFrame, model: Any
+    ) -> dict[str, float | None]:
+        """
+        Calcula métricas de qualidade associadas ao modelo de processo gerado.
+
+        Subclasses podem sobrescrever este método para retornar um dicionário com
+        métricas específicas do modelo. Cada métrica deve mapear para um valor
+        numérico (ou ``None`` quando não aplicável).
+
+        :param df: DataFrame de eventos utilizado na geração do modelo.
+        :param model: Modelo previamente retornado por :meth:`compute`.
+        :returns: Dicionário contendo métricas de qualidade do modelo.
+        :raises NotImplementedError: se não implementado em subclasses.
+        """
+        raise NotImplementedError(
+            "Subclasses devem implementar quality_metrics()"
+        )
