@@ -18,6 +18,23 @@ def filter_section(*, disabled: bool = False):
     event_log_view = filter_by_variants(event_log_view, disabled) or event_log_view
     temporal_filter()
 
+    if "process_model_type" not in st.session_state:
+        st.session_state["process_model_type"] = "dfg"
+
+    process_model_options = ["dfg", "petri-net"]
+    if st.session_state["process_model_type"] not in process_model_options:
+        st.session_state["process_model_type"] = "dfg"
+
+    labels = {"dfg": "DFG", "petri-net": "Petri Net"}
+    st.radio(
+        label="Process model",
+        options=process_model_options,
+        format_func=lambda opt: labels.get(opt, opt),
+        key="process_model_type",
+        disabled=disabled,
+    )
+    selected_model_type = st.session_state["process_model_type"]
+
     st.dataframe(event_log_view.compute())
 
     # Área inferior com botão à direita
@@ -26,7 +43,7 @@ def filter_section(*, disabled: bool = False):
         if st.button("Gerar", key="filters.generate", disabled=disabled):
             try:
                 with st.spinner("Gerando modelo..."):
-                    view = generate_process_model(event_log_view)
+                    view = generate_process_model(event_log_view, model=selected_model_type)
                     st.session_state.latest_generated_model = view
                 # Abre diálogo para visualização e salvamento
                 show_generated_model_dialog()

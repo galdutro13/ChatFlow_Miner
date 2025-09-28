@@ -152,6 +152,7 @@ class DFGModel(BaseProcessModel):
                     initial_marking,
                     final_marking,
                     parameters=eval_params,
+                    variant=precision_algorithm.Variants.ETCONFORMANCE_TOKEN,
                 )
                 metrics["precision"] = _safe_number(precision_val)
             except Exception:

@@ -202,6 +202,7 @@ def add_process_model(
     factories = {
         "dfg": DFGModel,
         "petri_net": PetriNetModel,
+        "petri-net": PetriNetModel,
         "petri": PetriNetModel,
     }
     try:
