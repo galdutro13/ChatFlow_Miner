@@ -68,39 +68,69 @@ class PetriNetModel(BaseProcessModel):
         return gviz
 
     def quality_metrics(
-        self,
-        df: pd.DataFrame,
-        model: Tuple[Any, Any, Any],
-    ) -> Dict[str, float | None]:
-        """Calcula métricas de qualidade para a rede de Petri descoberta."""
+            self,
+            df: "pd.DataFrame",
+            model: "Tuple[Any, Any, Any]",
+    ) -> "Dict[str, float | None]":
+        """
+        Calcula métricas de qualidade para a rede de Petri descoberta, evitando
+        recomputações caras por alinhamento e priorizando variantes de alta
+        performance.
 
-        metrics: Dict[str, float | None] = {
-            "fitness": None,
-            "precision": None,
-            "generalization": None,
-            "simplicity": None,
-        }
+        Estratégia:
+        - Converte o DataFrame para EventLog apenas 1x.
+        - Caminho rápido (default):
+            * fitness: token-based replay (rápido e estável)
+            * precision: ETConformance por token-based (rápido)
+        - Se precision token-based falhar, faz 1 passada de alinhamentos e REUSA
+          o resultado para:
+            * precision: ALIGN_ETCONFORMANCE
+            * fitness: derivado dos alinhamentos (sem novo replay)
+        - generalization e simplicity permanecem inalteradas.
+        - Retorna floats ou None (se indisponível/erro), com logging detalhado.
 
-        net, initial_marking, final_marking = model
+        Parâmetros esperados no log:
+        - Atividade em `xes_constants.DEFAULT_NAME_KEY` (ex.: 'concept:name').
 
-        from pm4py.algo.evaluation.replay_fitness import (
-            algorithm as replay_fitness_algorithm,
-        )
-        from pm4py.algo.evaluation.precision import algorithm as precision_algorithm
-        from pm4py.algo.evaluation.generalization import (
-            algorithm as generalization_algorithm,
-        )
-        from pm4py.algo.evaluation.simplicity import (
-            algorithm as simplicity_algorithm,
-        )
+        Returns
+        -------
+        Dict[str, float | None]
+            Dicionário com métricas: fitness, precision, generalization, simplicity.
+        """
+        import math
+        import time
+        import logging
+
+        LOGGER = logging.getLogger(__name__)
+
+        # Imports locais para robustez a mudanças de API entre versões
+        try:
+            from pm4py.algo.evaluation.replay_fitness import algorithm as rf_algorithm
+            from pm4py.algo.evaluation.precision import algorithm as prec_algorithm
+            from pm4py.algo.evaluation.generalization import algorithm as gen_algorithm
+            from pm4py.algo.evaluation.simplicity import algorithm as simp_algorithm
+        except Exception:  # fallback para caminhos antigos/novos
+            from pm4py.evaluation import replay_fitness as rf_algorithm  # type: ignore
+            from pm4py.evaluation import precision as prec_algorithm  # type: ignore
+            from pm4py.evaluation import generalization as gen_algorithm  # type: ignore
+            from pm4py.evaluation import simplicity as simp_algorithm  # type: ignore
+
+        # Para avaliar fitness a partir de alinhamentos já calculados (reuso)
+        try:
+            from pm4py.evaluation.replay_fitness.variants import alignment_based as rf_align_eval  # type: ignore
+        except Exception:
+            try:
+                from pm4py.algo.evaluation.replay_fitness.variants import \
+                    alignment_based as rf_align_eval  # type: ignore
+            except Exception:
+                rf_align_eval = None  # Sem reuso (degrada para cálculo direto)
+
         from pm4py.util import constants as pm_constants
         from pm4py.util import xes_constants
+        import pm4py
 
-        eval_params = {
-            pm_constants.PARAMETER_CONSTANT_ACTIVITY_KEY: xes_constants.DEFAULT_NAME_KEY,
-        }
-
-        def _safe_number(value: Any) -> float | None:
+        def _safe_number(value: "Any") -> "float | None":
+            """Converte para float robustamente, retornando None se NaN/inf ou inválido."""
             try:
                 num = float(value)
             except (TypeError, ValueError):
@@ -109,53 +139,149 @@ class PetriNetModel(BaseProcessModel):
                 return None
             return num
 
-        if not df.empty:
-            try:
-                fitness_res = replay_fitness_algorithm.apply(
-                    df,
-                    net,
-                    initial_marking,
-                    final_marking,
-                    parameters=eval_params,
-                )
-                fitness_val = fitness_res.get("log_fitness")
-                if fitness_val is None:
-                    fitness_val = fitness_res.get("average_trace_fitness")
-                metrics["fitness"] = _safe_number(fitness_val)
-            except Exception:  # pragma: no cover - logado abaixo
-                LOGGER.exception("Falha ao calcular fitness da rede de Petri")
+        metrics: "Dict[str, float | None]" = {
+            "fitness": None,
+            "precision": None,
+            "generalization": None,
+            "simplicity": None,
+        }
 
-            try:
-                precision_val = precision_algorithm.apply(
-                    df,
-                    net,
-                    initial_marking,
-                    final_marking,
-                    parameters=eval_params,
-                    variant=precision_algorithm.Variants.ETCONFORMANCE_TOKEN,
-                )
-                metrics["precision"] = _safe_number(precision_val)
-            except Exception:  # pragma: no cover - logado abaixo
-                LOGGER.exception("Falha ao calcular precision da rede de Petri")
+        net, initial_marking, final_marking = model
 
+        # Converte o DF para EventLog apenas uma vez (evita custo repetido)
+        event_log = None
+        if df is not None and not df.empty:
             try:
-                generalization_val = generalization_algorithm.apply(
-                    df,
-                    net,
-                    initial_marking,
-                    final_marking,
-                    parameters=eval_params,
-                )
-                metrics["generalization"] = _safe_number(generalization_val)
-            except Exception:  # pragma: no cover - logado abaixo
-                LOGGER.exception(
-                    "Falha ao calcular generalization da rede de Petri",
-                )
+                event_log = pm4py.convert_to_event_log(df)
+            except Exception:
+                # Se a conversão falhar, ainda tentaremos com DF onde possível.
+                LOGGER.exception("Falha ao converter DataFrame para EventLog; prosseguindo com DF quando suportado.")
+                event_log = None
 
+        # Parâmetros compartilhados
+        eval_params: "Dict[str, Any]" = {
+            pm_constants.PARAMETER_CONSTANT_ACTIVITY_KEY: xes_constants.DEFAULT_NAME_KEY,
+        }
+
+        # ---------------------------
+        # Simplicity (barata)
+        # ---------------------------
         try:
-            simplicity_val = simplicity_algorithm.apply(net)
-            metrics["simplicity"] = _safe_number(simplicity_val)
-        except Exception:  # pragma: no cover - logado abaixo
+            simp_val = simp_algorithm.apply(net)
+            metrics["simplicity"] = _safe_number(simp_val)
+        except Exception:
             LOGGER.exception("Falha ao calcular simplicity da rede de Petri")
 
+        # Nada mais a fazer se não há eventos
+        if event_log is None and (df is None or df.empty):
+            return metrics
+
+        # ---------------------------
+        # Generalization (moderado)
+        # ---------------------------
+        try:
+            # PM4Py aceita EventLog ou DF; preferimos EventLog se disponível
+            gen_val = gen_algorithm.apply(event_log if event_log is not None else df, net, initial_marking,
+                                          final_marking, parameters=eval_params)
+            metrics["generalization"] = _safe_number(gen_val)
+        except Exception:
+            LOGGER.exception("Falha ao calcular generalization da rede de Petri")
+
+        # ---------------------------
+        # Caminho RÁPIDO por padrão:
+        #   - Fitness: TOKEN_BASED
+        #   - Precision: ETCONFORMANCE_TOKEN
+        # ---------------------------
+        alignments_cache = None  # para eventual fallback alinhado
+
+        # Fitness (token-based)
+        try:
+            fitness_res = rf_algorithm.apply(
+                event_log if event_log is not None else df,
+                net,
+                initial_marking,
+                final_marking,
+                parameters=eval_params,
+                variant=getattr(rf_algorithm, "Variants").TOKEN_BASED,  # força caminho rápido
+            )
+            # PM4Py retorna dict com 'log_fitness' ou 'average_trace_fitness'
+            fitness_val = fitness_res.get("log_fitness") or fitness_res.get("average_trace_fitness")
+            metrics["fitness"] = _safe_number(fitness_val)
+        except Exception:
+            LOGGER.exception(
+                "Falha ao calcular fitness (token-based). Tentaremos reaproveitar alinhamentos se existirem.")
+
+        # Precision (token-based ETConformance)
+        precision_ok = False
+        try:
+            metrics["precision"] = _safe_number(
+                prec_algorithm.apply(
+                    event_log if event_log is not None else df,
+                    net,
+                    initial_marking,
+                    final_marking,
+                    parameters=eval_params,
+                    variant=getattr(prec_algorithm, "Variants").ETCONFORMANCE_TOKEN,  # rápido
+                )
+            )
+            precision_ok = metrics["precision"] is not None
+        except Exception:
+            LOGGER.exception("Falha ao calcular precision (ETConformance por token-based).")
+            precision_ok = False
+
+        # ---------------------------
+        # Fallback ALINHADO (1x) se preciso:
+        #   * necessário quando precision token-based falha ou retorna None/NaN.
+        #   * REUSA o mesmo alinhamento para derivar fitness (sem novo replay).
+        # ---------------------------
+        if not precision_ok:
+            try:
+                # Uma passada de alinhamento (pode ser custosa). Habilita multiprocessing (quando seguro).
+                # Usa a API de alto nível do PM4Py para obter diagnósticos de alinhamento.
+                alignments_cache = pm4py.conformance.conformance_diagnostics_alignments(
+                    event_log if event_log is not None else pm4py.convert_to_event_log(df),
+                    net,
+                    initial_marking,
+                    final_marking,
+                    multi_processing=True,
+                )
+
+                # Precision via ALIGN_ETCONFORMANCE a partir dos alinhamentos (parâmetro padrão da variante usa alinhamentos internos);
+                # alguns releases aceitam passar explicitamente o resultado de alinhamentos via 'parameters'.
+                try:
+                    metrics["precision"] = _safe_number(
+                        prec_algorithm.apply(
+                            event_log if event_log is not None else df,
+                            net,
+                            initial_marking,
+                            final_marking,
+                            parameters={**eval_params, "aligned_traces": alignments_cache},
+                            variant=getattr(prec_algorithm, "Variants").ALIGN_ETCONFORMANCE,
+                        )
+                    )
+                except Exception:
+                    # Tenta sem injetar 'aligned_traces' (variante fará o uso interno do algoritmo de alinhamento)
+                    metrics["precision"] = _safe_number(
+                        prec_algorithm.apply(
+                            event_log if event_log is not None else df,
+                            net,
+                            initial_marking,
+                            final_marking,
+                            parameters=eval_params,
+                            variant=getattr(prec_algorithm, "Variants").ALIGN_ETCONFORMANCE,
+                        )
+                    )
+
+                # Se fitness ainda está None, deriva dos MESMOS alinhamentos (zero recomputação)
+                if metrics["fitness"] is None and rf_align_eval is not None:
+                    try:
+                        fitness_from_al = rf_align_eval.evaluate(alignments_cache, parameters=eval_params)
+                        fitness_val = fitness_from_al.get("log_fitness") or fitness_from_al.get("average_trace_fitness")
+                        metrics["fitness"] = _safe_number(fitness_val)
+                    except Exception:
+                        LOGGER.exception("Falha ao avaliar fitness a partir dos alinhamentos pré-computados.")
+            except Exception:
+                LOGGER.exception("Fallback alinhado falhou (cálculo de alinhamentos/precision).")
+
         return metrics
+
