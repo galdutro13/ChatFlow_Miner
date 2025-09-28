@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Mapping
 import logging
 
 import pandas as pd
 import streamlit as st
 
+from .base import BaseProcessModel
 from .dfg import DFGModel
+from .petri_net import PetriNetModel
 from .view import ProcessModelView
 from ..event_log.view import EventLogView
 from ..state.manager import set_selected_model
@@ -40,14 +42,45 @@ def name_is_unique(name: str, existing: Iterable[str]) -> bool:
 # Model generation and render
 # -----------------------------
 
-def generate_process_model(log_view: EventLogView) -> ProcessModelView:
-    """Gera um ProcessModelView a partir de um EventLogView.
+_MODEL_FACTORY: Mapping[str, type[BaseProcessModel]] = {
+    "dfg": DFGModel,
+    "petri_net": PetriNetModel,
+    "petri": PetriNetModel,
+}
+_CANONICAL_KEYS = ("dfg", "petri_net")
 
-    Retorna uma ProcessModelView que combina o log_view com um DFGModel.
-    O modelo será computado lazy quando necessário.
+
+def _resolve_model(model: BaseProcessModel | str | None) -> BaseProcessModel:
+    if model is None:
+        return DFGModel()
+    if isinstance(model, BaseProcessModel):
+        return model
+
+    key = str(model).strip().casefold()
+    try:
+        model_cls = _MODEL_FACTORY[key]
+    except KeyError as exc:  # pragma: no cover - defensive path
+        available = "', '".join(_CANONICAL_KEYS)
+        raise ValueError(
+            "Tipo de modelo inválido. Forneça uma instância ou uma das chaves: "
+            f"'{available}'."
+        ) from exc
+    return model_cls()
+
+
+def generate_process_model(
+    log_view: EventLogView,
+    model: BaseProcessModel | str | None = None,
+) -> ProcessModelView:
+    """Gera um :class:`ProcessModelView` a partir de um log de eventos.
+
+    ``model`` pode ser uma instância pronta de ``BaseProcessModel`` ou uma
+    string correspondente às chaves do mapeamento local. O comportamento padrão
+    permanece utilizando ``DFGModel`` quando nenhum valor é informado.
     """
-    model = DFGModel()
-    return ProcessModelView(log_view=log_view, model=model)
+
+    resolved = _resolve_model(model)
+    return ProcessModelView(log_view=log_view, model=resolved)
 
 
 def render_process_graph(view: ProcessModelView) -> None:

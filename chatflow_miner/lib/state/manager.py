@@ -2,7 +2,12 @@ from typing import Dict, Tuple, Optional, Union, Sequence, Set, Any
 import pandas as pd
 import streamlit as st
 
-from chatflow_miner.lib.process_models import ProcessModelRegistry, ProcessModelView, DFGModel
+from chatflow_miner.lib.process_models import (
+    ProcessModelRegistry,
+    ProcessModelView,
+    DFGModel,
+    PetriNetModel,
+)
 from chatflow_miner.lib.event_log.view import EventLogView
 
 PLACEHOLDER = "Criar novo modelo de processo..."
@@ -193,11 +198,21 @@ def add_process_model(
             raise RuntimeError("Nenhum log de eventos disponível. Carregue um arquivo primeiro.")
         log_view = log_data
     
-    # Cria o modelo baseado no tipo
-    if model_type.lower() == "dfg":
-        model = DFGModel(**model_kwargs)
-    else:
-        raise ValueError(f"Tipo de modelo '{model_type}' não é suportado. Tipos disponíveis: 'dfg'")
+    model_type_key = model_type.strip().casefold()
+    factories = {
+        "dfg": DFGModel,
+        "petri_net": PetriNetModel,
+        "petri": PetriNetModel,
+    }
+    try:
+        model_cls = factories[model_type_key]
+    except KeyError as exc:
+        raise ValueError(
+            f"Tipo de modelo '{model_type}' não é suportado. Tipos disponíveis: "
+            "'dfg', 'petri_net'"
+        ) from exc
+
+    model = model_cls(**model_kwargs)
     
     # Cria a ProcessModelView
     process_model_view = ProcessModelView(log_view=log_view, model=model)

@@ -1,5 +1,6 @@
 import pandas as pd
 import pm4py
+import pytest
 import sys
 import importlib
 
@@ -36,14 +37,22 @@ def _sample_log_df() -> pd.DataFrame:
     return formatted
 
 
-def test_quality_metrics_are_computed_and_cached():
+@pytest.mark.parametrize(
+    "module_path,class_name",
+    [
+        ("chatflow_miner.lib.process_models.dfg", "DFGModel"),
+        ("chatflow_miner.lib.process_models.petri_net", "PetriNetModel"),
+    ],
+)
+def test_quality_metrics_are_computed_and_cached(module_path, class_name):
     df = _sample_log_df()
     from chatflow_miner.lib.event_log.view import EventLogView
     from chatflow_miner.lib.process_models.view import ProcessModelView
-    from chatflow_miner.lib.process_models.dfg import DFGModel
 
     log_view = EventLogView(df)
-    view = ProcessModelView(log_view=log_view, model=DFGModel())
+    module = importlib.import_module(module_path)
+    model_cls = getattr(module, class_name)
+    view = ProcessModelView(log_view=log_view, model=model_cls())
 
     metrics = view.quality_metrics()
 
@@ -58,5 +67,5 @@ def test_quality_metrics_are_computed_and_cached():
     assert cached_metrics is metrics
 
     # Limpa o módulo para que testes que usam stubs consigam reimportar com monkeypatch
-    sys.modules.pop("chatflow_miner.lib.process_models.dfg", None)
+    sys.modules.pop(module_path, None)
     importlib.invalidate_caches()
