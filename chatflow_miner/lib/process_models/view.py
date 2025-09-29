@@ -21,7 +21,7 @@ class ProcessModelView:
     model: BaseProcessModel
     _cached: Optional[Any] = field(default=None, init=False, repr=False)
     _cached_graphviz: dict = field(default_factory=dict, init=False, repr=False)
-    _cached_quality: dict[str, float | None] | None = field(
+    _cached_quality: dict[str, float | bool | None] | None = field(
         default=None, init=False, repr=False
     )
 
@@ -73,7 +73,7 @@ class ProcessModelView:
         self._cached_graphviz[cache_key] = viz
         return viz
 
-    def quality_metrics(self) -> dict[str, float | None]:
+    def quality_metrics(self) -> dict[str, float | bool | None]:
         """Calcula e retorna métricas de qualidade do modelo."""
 
         if self._cached_quality is not None:
@@ -99,11 +99,20 @@ class ProcessModelView:
         metrics_mapping = quality_fn(df, result)
         metrics_dict = dict(metrics_mapping)
 
-        sanitized: dict[str, float | None] = {}
+        sanitized: dict[str, float | bool | None] = {}
+        bool_types: tuple[type, ...]
+        try:
+            import numpy as np  # type: ignore
+
+            bool_types = (bool, np.bool_)
+        except Exception:
+            bool_types = (bool,)
         for raw_key, value in metrics_dict.items():
             key = str(raw_key)
             if value is None:
                 sanitized[key] = None
+            elif isinstance(value, bool_types):
+                sanitized[key] = bool(value)
             elif isinstance(value, numbers.Number):
                 sanitized[key] = float(value)
             else:

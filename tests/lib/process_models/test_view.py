@@ -1,7 +1,6 @@
 import pandas as pd
 import pm4py
 
-
 def _build_formatted_log() -> pd.DataFrame:
     raw = pd.DataFrame(
         {
@@ -50,9 +49,10 @@ def test_quality_metrics_returns_expected_keys_and_caches():
         "precision",
         "generalization",
         "simplicity",
+        "soundness",
     }
     for value in metrics.values():
-        assert value is None or isinstance(value, float)
+        assert value is None or isinstance(value, (float, bool))
 
     # segunda chamada deve reutilizar o cache
     assert model_view.quality_metrics() is metrics
@@ -81,9 +81,35 @@ def test_quality_metrics_on_empty_log_returns_none_values():
 
     metrics = model_view.quality_metrics()
 
-    assert metrics == {
-        "fitness": None,
-        "precision": None,
-        "generalization": None,
-        "simplicity": None,
-    }
+    assert metrics["soundness"] is None
+    assert metrics["fitness"] is None
+    assert metrics["precision"] is None
+    assert metrics["generalization"] is None
+    assert metrics["simplicity"] is None or isinstance(metrics["simplicity"], float)
+
+
+def test_quality_metrics_preserves_boolean_values():
+    from chatflow_miner.lib.process_models.base import BaseProcessModel
+    from chatflow_miner.lib.process_models.view import ProcessModelView
+
+    class _BoolModel(BaseProcessModel):
+        def compute(self, df):
+            return object()
+
+        def quality_metrics(self, df, model):
+            return {
+                "fitness": 0.123,
+                "precision": 0.456,
+                "generalization": 0.789,
+                "simplicity": 0.321,
+                "soundness": True,
+            }
+
+    dummy_df = pd.DataFrame({})
+    view = ProcessModelView(log_view=dummy_df, model=_BoolModel())
+
+    metrics = view.quality_metrics()
+
+    assert metrics["soundness"] is True
+    assert isinstance(metrics["fitness"], float)
+

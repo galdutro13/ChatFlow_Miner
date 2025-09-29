@@ -7,6 +7,7 @@ import pm4py
 from graphviz import Digraph
 
 from .base import BaseProcessModel
+from .soundness import evaluate_soundness
 
 
 LOGGER = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class DFGModel(BaseProcessModel):
             self,
             df: "pd.DataFrame",
             model: "Tuple[dict, dict, dict]",
-    ) -> "Dict[str, float | None]":
+    ) -> "Dict[str, float | bool | None]":
         """
         Calcula métricas de qualidade para um DFG convertendo-o para rede de Petri
         e aplicando avaliadores de conformidade de alto desempenho.
@@ -79,7 +80,9 @@ class DFGModel(BaseProcessModel):
                 - precision via ALIGN_ETCONFORMANCE
                 - fitness derivado desses alinhamentos (sem novo replay)
         - generalization e simplicity: como de costume.
-        - Retorna floats ou None (se indisponível/erro), com logging detalhado.
+        - soundness: avaliada sobre a rede de Petri derivada.
+        - Retorna floats, booleanos (para soundness) ou None (se indisponível/erro),
+          com logging detalhado.
 
         Parâmetros de log:
         - Atividade em `xes_constants.DEFAULT_NAME_KEY` (ex.: 'concept:name').
@@ -94,9 +97,9 @@ class DFGModel(BaseProcessModel):
 
         Returns
         -------
-        Dict[str, float | None]
+        Dict[str, float | bool | None]
             Dicionário com métricas: ``fitness``, ``precision``, ``generalization``,
-            ``simplicity``.
+            ``simplicity`` e ``soundness`` (solidez da rede de Petri derivada).
         """
         import math
         import logging
@@ -126,6 +129,7 @@ class DFGModel(BaseProcessModel):
                 "precision": None,
                 "generalization": None,
                 "simplicity": None,
+                "soundness": None,
             }
 
         # ---------------------------
@@ -170,12 +174,23 @@ class DFGModel(BaseProcessModel):
                 return None
             return num
 
-        metrics: "Dict[str, float | None]" = {
+        metrics: "Dict[str, float | bool | None]" = {
             "fitness": None,
             "precision": None,
             "generalization": None,
             "simplicity": None,
+            "soundness": None,
         }
+
+        try:
+            metrics["soundness"] = evaluate_soundness(
+                net,
+                initial_marking,
+                final_marking,
+                logger=LOGGER,
+            )
+        except Exception:  # pragma: no cover - falha defensiva
+            LOGGER.exception("Falha inesperada ao calcular soundness do modelo DFG")
 
         eval_params: "Dict[str, Any]" = {
             pm_constants.PARAMETER_CONSTANT_ACTIVITY_KEY: xes_constants.DEFAULT_NAME_KEY,

@@ -7,6 +7,7 @@ import math
 import pandas as pd
 
 from .base import BaseProcessModel
+from .soundness import evaluate_soundness
 
 
 LOGGER = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ class PetriNetModel(BaseProcessModel):
             self,
             df: "pd.DataFrame",
             model: "Tuple[Any, Any, Any]",
-    ) -> "Dict[str, float | None]":
+    ) -> "Dict[str, float | bool | None]":
         """
         Calcula métricas de qualidade para a rede de Petri descoberta, evitando
         recomputações caras por alinhamento e priorizando variantes de alta
@@ -87,15 +88,18 @@ class PetriNetModel(BaseProcessModel):
             * precision: ALIGN_ETCONFORMANCE
             * fitness: derivado dos alinhamentos (sem novo replay)
         - generalization e simplicity permanecem inalteradas.
-        - Retorna floats ou None (se indisponível/erro), com logging detalhado.
+        - soundness: avaliada sobre a rede descoberta.
+        - Retorna floats, booleanos (para soundness) ou None (se indisponível/erro),
+          com logging detalhado.
 
         Parâmetros esperados no log:
         - Atividade em `xes_constants.DEFAULT_NAME_KEY` (ex.: 'concept:name').
 
         Returns
         -------
-        Dict[str, float | None]
-            Dicionário com métricas: fitness, precision, generalization, simplicity.
+        Dict[str, float | bool | None]
+            Dicionário com métricas: fitness, precision, generalization,
+            simplicity e soundness (solidez da rede descoberta).
         """
         import math
         import time
@@ -139,14 +143,25 @@ class PetriNetModel(BaseProcessModel):
                 return None
             return num
 
-        metrics: "Dict[str, float | None]" = {
+        metrics: "Dict[str, float | bool | None]" = {
             "fitness": None,
             "precision": None,
             "generalization": None,
             "simplicity": None,
+            "soundness": None,
         }
 
         net, initial_marking, final_marking = model
+
+        try:
+            metrics["soundness"] = evaluate_soundness(
+                net,
+                initial_marking,
+                final_marking,
+                logger=LOGGER,
+            )
+        except Exception:  # pragma: no cover - caminho altamente defensivo
+            LOGGER.exception("Falha inesperada ao calcular soundness da rede de Petri")
 
         # Converte o DF para EventLog apenas uma vez (evita custo repetido)
         event_log = None

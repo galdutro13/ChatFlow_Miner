@@ -1,8 +1,9 @@
+import importlib
+import sys
+
 import pandas as pd
 import pm4py
 import pytest
-import sys
-import importlib
 
 
 def _sample_log_df() -> pd.DataFrame:
@@ -56,12 +57,18 @@ def test_quality_metrics_are_computed_and_cached(module_path, class_name):
 
     metrics = view.quality_metrics()
 
-    expected_keys = {"fitness", "precision", "generalization", "simplicity"}
+    expected_keys = {
+        "fitness",
+        "precision",
+        "generalization",
+        "simplicity",
+        "soundness",
+    }
     assert expected_keys.issubset(metrics.keys())
 
     for key in expected_keys:
         value = metrics[key]
-        assert value is None or isinstance(value, float)
+        assert value is None or isinstance(value, (float, bool))
 
     cached_metrics = view.quality_metrics()
     assert cached_metrics is metrics
