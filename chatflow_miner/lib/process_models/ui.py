@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Iterable, Mapping
-import numbers
 import logging
 
 import pandas as pd
@@ -203,13 +202,10 @@ def render_saved_model_ui(selected_name: str) -> None:
         ("precision", "Precisão"),
         ("generalization", "Generalização"),
         ("simplicity", "Simplicidade"),
-        ("soundness", "Soundness (Solidez)"),
     ]
     for key, label in ordered_keys:
         value = metrics.get(key)
-        if isinstance(value, bool):
-            display = "Sim" if value else "Não"
-        elif isinstance(value, numbers.Number):
+        if isinstance(value, (int, float)):
             display = f"{value:.3f}"
         else:
             display = "N/A"

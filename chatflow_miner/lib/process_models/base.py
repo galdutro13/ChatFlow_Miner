@@ -43,14 +43,13 @@ class BaseProcessModel:
 
     def quality_metrics(
         self, df: pd.DataFrame, model: Any
-    ) -> dict[str, float | bool | None]:
+    ) -> dict[str, float | None]:
         """
         Calcula métricas de qualidade associadas ao modelo de processo gerado.
 
         Subclasses podem sobrescrever este método para retornar um dicionário com
         métricas específicas do modelo. Cada métrica deve mapear para um valor
-        numérico, booleano (quando a métrica representa um resultado lógico)
-        ou ``None`` quando não aplicável.
+        numérico (ou ``None`` quando não aplicável).
 
         :param df: DataFrame de eventos utilizado na geração do modelo.
         :param model: Modelo previamente retornado por :meth:`compute`.
