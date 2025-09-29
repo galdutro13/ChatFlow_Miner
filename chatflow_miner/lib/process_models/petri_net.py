@@ -29,7 +29,7 @@ class PetriNetModel(BaseProcessModel):
         """Descobre a rede de Petri utilizando o Inductive Miner."""
         import pm4py
 
-        net, initial_marking, final_marking = pm4py.discover_petri_net_inductive(df)
+        net, initial_marking, final_marking = pm4py.discover_petri_net_inductive(df, noise_threshold=0.2)
         return net, initial_marking, final_marking
 
     def to_graphviz(
