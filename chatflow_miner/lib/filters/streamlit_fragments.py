@@ -2,13 +2,18 @@ import streamlit as st
 import pandas as pd
 
 from chatflow_miner.lib.state import get_log_eventos
-from chatflow_miner.lib.filters.builtins import AgentFilter, CaseFilter
+from chatflow_miner.lib.constants import COLUMN_START_TS
+from chatflow_miner.lib.filters.builtins import AgentFilter, CaseFilter, TimeWindowFilter
 from chatflow_miner.lib.event_log.view import EventLogView
 from chatflow_miner.lib.process_models.ui import (
     generate_process_model,
     show_generated_model_dialog,
 )
-from chatflow_miner.lib.aggregations import CaseVariantAggregator, CaseAggView
+from chatflow_miner.lib.aggregations import (
+    CaseVariantAggregator,
+    CaseAggView,
+    CaseDateAggregator,
+)
 
 @st.fragment
 def filter_section(*, disabled: bool = False):
@@ -16,7 +21,7 @@ def filter_section(*, disabled: bool = False):
     st.markdown("Filtro de dados - <u>Em construção</u>", unsafe_allow_html=True)
     event_log_view = filter_by_agents(disabled)
     event_log_view = filter_by_variants(event_log_view, disabled) or event_log_view
-    temporal_filter()
+    event_log_view = temporal_filter(event_log_view, disabled) or event_log_view
 
     if "process_model_type" not in st.session_state:
         st.session_state["process_model_type"] = "dfg"
@@ -54,7 +59,7 @@ def filter_section(*, disabled: bool = False):
                 st.exception(exc)
 
 
-def filter_by_variants(event_view: EventLogView, disabled: bool):
+def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView | None:
     """
     Exibe e aplica um filtro de variantes de casos sobre um EventLogView usando Streamlit.
 
@@ -102,6 +107,67 @@ def filter_by_agents(disabled: bool) -> EventLogView:
     agent = {"chatbot": "ai", "cliente": "human"}.get(sel)
     return view.filter(AgentFilter(agent=agent)) if agent else view
 
-def temporal_filter():
-    st.markdown("Filtro temporal - <u>Em construção</u>", unsafe_allow_html=True)
-    st.info("Filtro temporal ainda não implementado.")
+def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | None:
+    """
+    Apresenta controles de filtro temporal na interface Streamlit e aplica um filtro
+    de janela temporal (TimeWindowFilter) sobre a EventLogView fornecida.
+
+    Comportamento:
+    - Se não houver dados de eventos disponíveis (get_log_eventos retorna None),
+      renderiza controles desabilitados e retorna None.
+    - Calcula opções de data a partir de agregação por caso (CaseDateAggregator),
+      apresenta sliders para data inicial e final, valida que a data final não seja
+      anterior à inicial e converte as datas selecionadas para timestamps
+      (incluindo o final do dia para a data final).
+    - Se a série de timestamps do log possuir informação de fuso (tz-aware),
+      ajusta os timestamps selecionados para o mesmo fuso horário.
+    - Retorna a EventLogView filtrada pelo TimeWindowFilter correspondente.
+
+    Parâmetros:
+        event_view (EventLogView): visão atual do log de eventos a ser filtrada.
+        disabled (bool): se True, desabilita os controles da interface Streamlit.
+
+    Retorno:
+        EventLogView ou None: a EventLogView filtrada pela janela temporal, ou None
+        se não houver dados de evento a serem filtrados.
+
+    Observações:
+    - A função exibe mensagens de erro na UI quando a data final é anterior à inicial.
+    - A janela temporal é inclusiva: a data final é ajustada para o último microssegundo do dia.
+    """
+    st.markdown("Filtro temporal", unsafe_allow_html=True)
+    df = get_log_eventos(which="log_eventos")
+
+    if df is None:
+        col1, col2 = st.columns(2)
+        for lbl, val, col in [("Data inicial", 1970, col1), ("Data final", 2025, col2)]:
+            with col:
+                st.select_slider(lbl, options=[1970, 1997, 2025], value=val, disabled=disabled)
+        return None
+
+    date_options = sorted(
+        {d for d in CaseAggView(base_df=df)
+        .with_aggregator(CaseDateAggregator())
+        .compute()
+        .values() if d}
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.select_slider("Data inicial", date_options, date_options[0], disabled=disabled)
+    with col2:
+        end_date = st.select_slider("Data final", date_options, date_options[-1], disabled=disabled)
+
+    if end_date < start_date:
+        st.error("Falha ao gerar o filtro temporal: a data final não pode ser anterior à data inicial.")
+
+    start_ts = pd.to_datetime(start_date).normalize()
+    end_ts = pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+
+    series = df.get(COLUMN_START_TS)
+    if series is not None and pd.api.types.is_datetime64tz_dtype(series.dtype):
+        tz = series.dt.tz
+        start_ts = start_ts if start_ts.tzinfo else start_ts.tz_localize(tz)
+        end_ts = end_ts if end_ts.tzinfo else end_ts.tz_localize(tz)
+
+    return event_view.filter(TimeWindowFilter(start=start_ts, end=end_ts))
