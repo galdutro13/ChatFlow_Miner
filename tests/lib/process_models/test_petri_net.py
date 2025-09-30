@@ -28,18 +28,18 @@ class TempModulePatcher:
                 sys.modules[name] = original
 
 
-def make_pm4py_stub(expected_model):
+def make_pm4py_stub(expected_model, *, expected_rankdir=None):
     pm4py = types.ModuleType("pm4py")
     pm4py.__path__ = []
 
-    pm4py.discover_petri_net_inductive = lambda df: expected_model
+    pm4py.discover_petri_net_inductive = lambda df, **kwargs: expected_model
 
     algo_mod = types.ModuleType("pm4py.algo")
     discovery_mod = types.ModuleType("pm4py.algo.discovery")
     inductive_mod = types.ModuleType("pm4py.algo.discovery.inductive")
     algorithm_mod = types.ModuleType("pm4py.algo.discovery.inductive.algorithm")
 
-    def apply_stub(df):
+    def apply_stub(df, **kwargs):
         return expected_model
 
     algorithm_mod.apply = apply_stub
@@ -48,15 +48,23 @@ def make_pm4py_stub(expected_model):
     petri_net_mod = types.ModuleType("pm4py.visualization.petri_net")
     visualizer_mod = types.ModuleType("pm4py.visualization.petri_net.visualizer")
 
+    parameters_ns = types.SimpleNamespace(
+        FORMAT="FORMAT",
+        RANKDIR="set_rankdir",
+    )
+
     class _Variants:
         class _WoDecoration:
             value = types.SimpleNamespace(
-                Parameters=types.SimpleNamespace(FORMAT="FORMAT"),
+                Parameters=parameters_ns,
             )
 
         WO_DECORATION = _WoDecoration()
 
     def visualizer_apply(net, initial_marking, final_marking, parameters, variant):
+        if expected_rankdir is not None:
+            assert parameters.get(parameters_ns.RANKDIR) == expected_rankdir
+            assert "rankdir" not in parameters
         return types.SimpleNamespace(
             kind="gviz",
             net=net,
@@ -118,7 +126,7 @@ def test_petrinetmodel_to_graphviz_forwards_kwargs():
         types.SimpleNamespace(marking="f"),
     )
 
-    mapping = make_pm4py_stub(expected_model)
+    mapping = make_pm4py_stub(expected_model, expected_rankdir="TB")
 
     with TempModulePatcher(mapping):
         from chatflow_miner.lib.process_models.petri_net import PetriNetModel
@@ -136,6 +144,7 @@ def test_petrinetmodel_to_graphviz_forwards_kwargs():
     assert getattr(gviz, "kind", None) == "gviz"
     params = getattr(gviz, "params", {})
     assert params.get("bgcolor") == "black"
-    assert params.get("rankdir") == "TB"
+    assert params.get("set_rankdir") == "TB"
+    assert "rankdir" not in params
     assert params.get("FORMAT") == "png"
     assert params.get("extra_option") == 123

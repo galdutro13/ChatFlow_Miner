@@ -54,8 +54,13 @@ class PetriNetModel(BaseProcessModel):
         parameters: Dict[str, Any] = {
             parameters_cls.FORMAT: fmt,
             "bgcolor": bg,
-            "rankdir": rd,
         }
+
+        rankdir_param = getattr(parameters_cls, "RANKDIR", None)
+        if rankdir_param is not None:
+            parameters[rankdir_param] = rd
+        else:
+            parameters["rankdir"] = rd
         parameters.update(kwargs)
 
         gviz = pn_visualizer.apply(
