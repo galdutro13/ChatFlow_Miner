@@ -24,7 +24,7 @@ col1, col2 = st.columns(2)
 with col1:
     # Pré-computar na linha abaixo para não precisar chamar get_log_eventos() duas vezes
     disabled = (load_info := get_log_eventos(which="load_info")) is not None # Desabilitar se já houver um arquivo carregado
-    col1.button("Carregar", on_click=open_input_dialog, type="primary", disabled=disabled)
+    col1.button("Carregar log de eventos", on_click=open_input_dialog, type="primary", disabled=disabled)
     if st.session_state.input_dialog:
         input_dataset()
 
