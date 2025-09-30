@@ -4,6 +4,7 @@ Simple verification script to test that the reorganized test structure works.
 This script imports the test modules to verify they can be loaded correctly.
 """
 
+from pathlib import Path
 import sys
 import importlib.util
 
@@ -21,10 +22,11 @@ def test_import(module_path, module_name):
 
 def main():
     """Test all the reorganized test files."""
+    repo_root = Path(__file__).resolve().parent
     test_files = [
-        ("tests/lib/filters/test_builtins.py", "test_builtins"),
-        ("tests/lib/filters/test_view.py", "test_view"),
-        ("tests/lib/process_models/test_dfg.py", "test_dfg"),
+        (repo_root / "tests/lib/filters/test_builtins.py", "tests.lib.filters.test_builtins"),
+        (repo_root / "tests/lib/event_log/test_view.py", "tests.lib.event_log.test_view"),
+        (repo_root / "tests/lib/process_models/test_dfg.py", "tests.lib.process_models.test_dfg"),
     ]
     
     print("Verifying reorganized test structure...")
@@ -32,7 +34,7 @@ def main():
     
     all_passed = True
     for file_path, module_name in test_files:
-        if not test_import(file_path, module_name):
+        if not test_import(str(file_path), module_name):
             all_passed = False
     
     print("=" * 50)
