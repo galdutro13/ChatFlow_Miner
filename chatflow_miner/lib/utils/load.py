@@ -30,6 +30,7 @@ def load_dataset(file: str, load_options: Dict[Any, Any]) -> pd.DataFrame:
         log = pm4py.format_dataframe(df,
                                      case_id=COLUMN_CASE_ID,
                                      activity_key=COLUMN_ACTIVITY,
+                                     # timestamp_key=COLUMN_START_TS)
                                      timestamp_key=COLUMN_END_TS,
                                      start_timestamp_key=COLUMN_START_TS)
         return log

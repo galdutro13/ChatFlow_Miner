@@ -28,7 +28,7 @@ class TempModulePatcher:
                 sys.modules[name] = self._originals[name]
 
 
-def make_pm4py_stub(discover_return):
+def make_pm4py_stub(discover_return, performance_return=None):
     pm4py = types.ModuleType("pm4py")
     # Mark as a package so nested imports are permitted
     pm4py.__path__ = []
@@ -37,6 +37,13 @@ def make_pm4py_stub(discover_return):
         return discover_return
 
     pm4py.discover_dfg = discover_dfg
+    
+    def discover_performance_dfg(df):
+        if performance_return is not None:
+            return performance_return
+        return discover_return
+
+    pm4py.discover_performance_dfg = discover_performance_dfg
     # Also provide visualization dfg module structure for to_graphviz
     vis_dfg = types.ModuleType("pm4py.visualization.dfg")
     visualizer = types.ModuleType("pm4py.visualization.dfg.visualizer")
@@ -49,6 +56,13 @@ def make_pm4py_stub(discover_return):
             ))
 
         FREQUENCY = _FrequencyVariant()
+        class _PerformanceVariant:
+            value = types.SimpleNamespace(Parameters=types.SimpleNamespace(
+                FORMAT="FORMAT", START_ACTIVITIES="START_ACTIVITIES",
+                END_ACTIVITIES="END_ACTIVITIES"
+            ))
+
+        PERFORMANCE = _PerformanceVariant()
 
     def apply_stub(dfg, variant, parameters):
         return types.SimpleNamespace(kind="gviz", dfg=dfg, params=parameters, variant=variant)

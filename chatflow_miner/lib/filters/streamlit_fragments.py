@@ -26,11 +26,15 @@ def filter_section(*, disabled: bool = False):
     if "process_model_type" not in st.session_state:
         st.session_state["process_model_type"] = "dfg"
 
-    process_model_options = ["dfg", "petri-net"]
+    process_model_options = ["dfg", "performance-dfg", "petri-net"]
     if st.session_state["process_model_type"] not in process_model_options:
         st.session_state["process_model_type"] = "dfg"
 
-    labels = {"dfg": "DFG", "petri-net": "Petri Net"}
+    labels = {
+        "dfg": "DFG",
+        "performance-dfg": "Performance DFG",
+        "petri-net": "Petri Net",
+    }
     st.radio(
         label="Process model",
         options=process_model_options,
