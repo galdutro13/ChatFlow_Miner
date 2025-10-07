@@ -325,9 +325,43 @@ class DFGModel(BaseProcessModel):
 
 
 class PerformanceDFGModel(BaseProcessModel):
-    """Modelo de DFG orientado a métricas de performance."""
+    """Modelo de DFG orientado a métricas de performance.
+
+    Este modelo gera um Directly-Follows Graph (DFG) enriquecido com
+    informações de performance (ex.: tempos médios/mediana de transição,
+    contagens, somas de duração) a partir de um DataFrame de eventos.
+
+    Observações importantes:
+    - Espera-se que o DataFrame siga o formato aceito pelo pm4py, com colunas
+      típicas como identificador de caso, nome da atividade e timestamp.
+    - As arestas do DFG resultante normalmente carregam atributos numéricos
+      relacionados à performance (por exemplo 'performance' ou nomes
+      específicos do pm4py para métricas). Consulte pm4py.discover_performance_dfg
+      para detalhes do esquema exato de atributos.
+    - Utilizar este modelo quando o foco for analisar latências/durações entre
+      atividades, além da estrutura diretamente sequencial do processo.
+    """
 
     def compute(self, df: pd.DataFrame) -> Tuple[dict, dict, dict]:
+        """
+        Constrói o Directly-Follows Graph (DFG) orientado a performance.
+
+        Parâmetros
+        ----------
+        df : pd.DataFrame
+            DataFrame de eventos no formato pm4py (colunas como case id, activity,
+            timestamp). O método delega a extração das métricas de performance ao
+            pm4py.discover_performance_dfg.
+
+        Retorno
+        -------
+        Tuple[dict, dict, dict]
+            Tupla (dfg, start_activities, end_activities):
+            - dfg: dicionário representando o grafo diretamente sequencial, cujas
+              arestas podem conter atributos de performance.
+            - start_activities: dicionário/estrutura com atividades iniciais.
+            - end_activities: dicionário/estrutura com atividades finais.
+        """
         dfg, start_activity, end_activity = pm4py.discover_performance_dfg(df, )
         return dfg, start_activity, end_activity
 
@@ -338,6 +372,32 @@ class PerformanceDFGModel(BaseProcessModel):
         rankdir: str = "LR",
         max_num_edges: int = 9223372036854775807,
     ) -> Digraph:
+        """
+        Gera uma visualização Graphviz do DFG com realce de métricas de performance.
+
+        Parâmetros
+        ----------
+        model : Tuple[dict, dict, dict]
+            Tupla (dfg, start_activities, end_activities) produzida por compute.
+        bgcolor : str, opcional
+            Cor de fundo do diagrama (padrão 'white').
+        rankdir : str, opcional
+            Direção do layout do grafo ('LR' ou 'TB', padrão 'LR').
+        max_num_edges : int, opcional
+            Limite de arestas a exibir; útil para logs muito densos.
+
+        Retorno
+        -------
+        Digraph
+            Objeto Graphviz/Digraph (normalmente em formato SVG) produzido pelo
+            visualizador de DFG do pm4py usando a variante PERFORMANCE.
+
+        Observações
+        ----------
+        - O visualizador injeta atributos de performance nas labels/estilos das
+          arestas quando suportado. Para ajustar o formato da imagem, modifique
+          o parâmetro de formato nas opções (por padrão 'svg' aqui).
+        """
         from pm4py.visualization.dfg import visualizer as dfg_visualizer
 
         dfg, start_activities, end_activities = model
@@ -364,7 +424,27 @@ class PerformanceDFGModel(BaseProcessModel):
             df: "pd.DataFrame",
             model: "Tuple[dict, dict, dict]",
     ) -> "Dict[str, float | None]":
-        """Reutiliza as métricas de qualidade do DFG clássico."""
+        """
+        Calcula métricas de qualidade do modelo DFG (fitness, precision, etc.).
+
+        Descrição sucinta
+        -----------------
+        Este método delega a computação das métricas para a função comum
+        _quality_metrics_for_dfg, que converte o DFG para uma rede de Petri e
+        executa avaliadores de conformidade e qualidade. As chaves retornadas
+        tipicamente incluem: 'fitness', 'precision', 'generalization' e 'simplicity'.
+
+        Parâmetros
+        ----------
+        df : pd.DataFrame
+            DataFrame de eventos usado para avaliar o modelo.
+        model : Tuple[dict, dict, dict]
+            O modelo DFG (dfg, start_activities, end_activities).
+
+        Retorno
+        -------
+        Dict[str, float | None]
+            Dicionário com valores numéricos (float) das métricas ou None quando
+            não puderem ser calculadas.
+        """
         return _quality_metrics_for_dfg(df, model)
-
-
