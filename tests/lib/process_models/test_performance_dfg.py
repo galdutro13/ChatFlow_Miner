@@ -80,5 +80,6 @@ def test_performance_dfgmodel_to_graphviz_uses_performance_variant():
     assert params.get("maxNoOfEdgesInDiagram") == 3
     variant = getattr(gviz, "variant", None)
     assert variant is pm4py_stub.visualization.dfg.visualizer.Variants.PERFORMANCE
+    assert getattr(gviz, "log", "__missing__") is None
     sys.modules.pop("chatflow_miner.lib.process_models.dfg", None)
     importlib.invalidate_caches()

@@ -27,12 +27,18 @@ class BaseProcessModel:
         """
         raise NotImplementedError("Subclasses devem implementar compute()")
 
-    def to_graphviz(self, model: Any, **kwargs: Any) -> Any:
+    def to_graphviz(
+        self, model: Any, log: Any | None = None, **kwargs: Any
+    ) -> Any:
         """
         Para modelos que suportam visualização via Graphviz (por exemplo DFG), este
         método pode ser sobrescrito para gerar a figura.
 
         :param model: Objeto do modelo previamente retornado por :meth:`compute`.
+        :param log: Representação do log de eventos utilizada na geração do modelo,
+            tipicamente um ``pm4py.objects.log.obj.EventLog``. O valor padrão é
+            ``None`` para manter compatibilidade com modelos que não necessitam do
+            log durante a visualização.
         :param kwargs: Parâmetros adicionais para a visualização.
         :returns: Objeto de figura ou visualização.
         :raises NotImplementedError: se o modelo não suporta visualização.

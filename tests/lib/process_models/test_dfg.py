@@ -44,6 +44,11 @@ def make_pm4py_stub(discover_return, performance_return=None):
         return discover_return
 
     pm4py.discover_performance_dfg = discover_performance_dfg
+    def convert_to_event_log(df):
+        return {"converted_df": df}
+
+    pm4py.convert_to_event_log = convert_to_event_log
+
     # Also provide visualization dfg module structure for to_graphviz
     vis_dfg = types.ModuleType("pm4py.visualization.dfg")
     visualizer = types.ModuleType("pm4py.visualization.dfg.visualizer")
@@ -64,8 +69,14 @@ def make_pm4py_stub(discover_return, performance_return=None):
 
         PERFORMANCE = _PerformanceVariant()
 
-    def apply_stub(dfg, variant, parameters):
-        return types.SimpleNamespace(kind="gviz", dfg=dfg, params=parameters, variant=variant)
+    def apply_stub(dfg, log=None, parameters=None, variant=None, **kwargs):
+        return types.SimpleNamespace(
+            kind="gviz",
+            dfg=dfg,
+            params=parameters,
+            variant=variant,
+            log=log,
+        )
 
     visualizer.Variants = _Variants
     visualizer.apply = apply_stub
@@ -143,6 +154,7 @@ def test_dfgmodel_to_graphviz_returns_visualizer_output_structure():
     assert params.get("rankdir") == "TB"
     assert params.get("maxNoOfEdgesInDiagram") == 5
 
-    # Ensure variant provided is FREQUENCY
+    # Ensure variant provided is FREQUENCY and log defaults to None when não fornecido
     variant = getattr(gviz, "variant", None)
     assert variant is not None
+    assert getattr(gviz, "log", "__missing__") is None

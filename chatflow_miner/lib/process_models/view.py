@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import logging
 import numbers
 from typing import Any, Optional
 import pandas as pd
+import pm4py
 
 from .base import BaseProcessModel
 from ..event_log.view import EventLogView
+
+
+LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class ProcessModelView:
@@ -69,7 +74,26 @@ class ProcessModelView:
         if cache_key in self._cached_graphviz:
             return self._cached_graphviz[cache_key]
 
-        viz = self.model.to_graphviz(result, **kwargs)
+        df: pd.DataFrame
+        if isinstance(self.log_view, EventLogView):
+            df = self.log_view.compute()
+        elif isinstance(self.log_view, pd.DataFrame):
+            df = self.log_view
+        else:
+            raise TypeError(
+                "log_view deve ser um EventLogView ou pandas.DataFrame"
+            )
+
+        event_log = None
+        if not df.empty:
+            try:
+                event_log = pm4py.convert_to_event_log(df)
+            except Exception:  # pragma: no cover - logged for observability
+                LOGGER.exception(
+                    "Falha ao converter DataFrame para EventLog durante a visualização."
+                )
+
+        viz = self.model.to_graphviz(result, log=event_log, **kwargs)
         self._cached_graphviz[cache_key] = viz
         return viz
 

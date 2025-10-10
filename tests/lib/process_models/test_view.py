@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 import pm4py
 
@@ -87,3 +89,64 @@ def test_quality_metrics_on_empty_log_returns_none_values():
         "generalization": None,
         "simplicity": None,
     }
+
+
+def test_to_graphviz_converts_log_once_and_passes_event_log(monkeypatch):
+    from pm4py.visualization.dfg import visualizer as dfg_visualizer
+    from chatflow_miner.lib.event_log.view import EventLogView
+    from chatflow_miner.lib.process_models import dfg as dfg_module
+    from chatflow_miner.lib.process_models import view as view_module
+    from chatflow_miner.lib.process_models.dfg import DFGModel
+    from chatflow_miner.lib.process_models.view import ProcessModelView
+
+    formatted = _build_formatted_log()
+    event_log_view = EventLogView(formatted)
+    model_view = ProcessModelView(log_view=event_log_view, model=DFGModel())
+
+    dfg_tuple = ({("A", "B"): 1}, {"A": 1}, {"B": 1})
+
+    discover_calls: list[pd.DataFrame] = []
+
+    def fake_discover_dfg(df):
+        discover_calls.append(df)
+        return dfg_tuple
+
+    convert_calls: list[pd.DataFrame] = []
+    event_log_obj = {"event_log": True}
+
+    def fake_convert(df):
+        convert_calls.append(df)
+        return event_log_obj
+
+    viz_calls: list[dict[str, Any]] = []
+
+    def fake_apply(dfg, log=None, parameters=None, variant=None, **kwargs):
+        viz_calls.append({
+            "dfg": dfg,
+            "log": log,
+            "parameters": parameters,
+            "variant": variant,
+        })
+        return {"gviz": len(viz_calls)}
+
+    monkeypatch.setattr(dfg_module.pm4py, "discover_dfg", fake_discover_dfg)
+    monkeypatch.setattr(view_module.pm4py, "convert_to_event_log", fake_convert)
+    monkeypatch.setattr(dfg_visualizer, "apply", fake_apply)
+
+    first = model_view.to_graphviz(bgcolor="white")
+    assert first == {"gviz": 1}
+    assert len(discover_calls) == 1
+    pd.testing.assert_frame_equal(discover_calls[0], formatted)
+    assert viz_calls[0]["log"] is event_log_obj
+    assert len(convert_calls) == 1
+    pd.testing.assert_frame_equal(convert_calls[0], formatted)
+
+    second = model_view.to_graphviz(bgcolor="white")
+    assert second is first
+    assert len(convert_calls) == 1
+    assert len(viz_calls) == 1
+
+    third = model_view.to_graphviz(rankdir="TB")
+    assert third == {"gviz": 2}
+    assert len(convert_calls) == 2
+    assert viz_calls[-1]["log"] is event_log_obj

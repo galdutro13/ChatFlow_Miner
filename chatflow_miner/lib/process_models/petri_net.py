@@ -39,6 +39,7 @@ class PetriNetModel(BaseProcessModel):
         bgcolor: str = "white",
         rankdir: str = "LR",
         format: str = "svg",
+        log: Any | None = None,
         **kwargs: Any,
     ) -> Any:
         """Gera uma visualização Graphviz da rede de Petri."""
@@ -46,6 +47,10 @@ class PetriNetModel(BaseProcessModel):
 
         net, initial_marking, final_marking = model
         parameters_cls = pn_visualizer.Variants.WO_DECORATION.value.Parameters
+
+        # Aceita ``log`` para manter compatibilidade com a nova assinatura da
+        # classe base, embora a visualização atual não o utilize diretamente.
+        _ = log
 
         fmt = kwargs.pop("format", format)
         bg = kwargs.pop("bgcolor", bgcolor)

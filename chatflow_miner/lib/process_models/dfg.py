@@ -7,6 +7,7 @@ import pm4py
 from graphviz import Digraph
 
 from .base import BaseProcessModel
+from chatflow_miner.lib.constants import COLUMN_START_TS, COLUMN_END_TS
 
 
 LOGGER = logging.getLogger(__name__)
@@ -290,7 +291,16 @@ class DFGModel(BaseProcessModel):
         dfg, start_activity, end_activity = pm4py.discover_dfg(df)
         return dfg, start_activity, end_activity
 
-    def to_graphviz(self, model: Tuple[dict, dict, dict], bgcolor: str = "white", rankdir: str = "LR", max_num_edges: int = 9223372036854775807) -> Digraph:
+    def to_graphviz(
+        self,
+        model: Tuple[dict, dict, dict],
+        bgcolor: str = "white",
+        rankdir: str = "LR",
+        max_num_edges: int = 9223372036854775807,
+        *,
+        log: Any | None = None,
+        event_df: pd.DataFrame | None = None,
+    ) -> Digraph:
         """
         Gera uma visualização do DFG usando Graphviz.
 
@@ -302,16 +312,31 @@ class DFGModel(BaseProcessModel):
         """
         # Implementação específica para gerar a visualização do DFG
         from pm4py.visualization.dfg import visualizer as dfg_visualizer
+
         dfg, start_activities, end_activities = model
         dfg_parameters = dfg_visualizer.Variants.FREQUENCY.value.Parameters
         # Corrige: não passar a builtin `format` (função) — é esperado um string com o formato de imagem.
         # Usar 'svg' ou 'png' ou 'html' conforme suporte do Graphviz/pm4py.
         parameters = {dfg_parameters.FORMAT: "svg", dfg_parameters.START_ACTIVITIES: start_activities,
                       dfg_parameters.END_ACTIVITIES: end_activities, "bgcolor": bgcolor, "rankdir": rankdir,
-                      "maxNoOfEdgesInDiagram": max_num_edges}
+                      "maxNoOfEdgesInDiagram": max_num_edges, dfg_parameters.TIMESTAMP_KEY: COLUMN_END_TS,
+                      dfg_parameters.START_TIMESTAMP_KEY: COLUMN_START_TS}
 
-        gviz = dfg_visualizer.apply(dfg, variant=dfg_visualizer.Variants.FREQUENCY,
-                                    parameters=parameters)
+        event_log = log
+        if event_log is None and event_df is not None and not event_df.empty:
+            try:
+                event_log = pm4py.convert_to_event_log(event_df)
+            except Exception:
+                LOGGER.exception(
+                    "Falha ao converter DataFrame em EventLog para visualização de DFG."
+                )
+
+        gviz = dfg_visualizer.apply(
+            dfg,
+            log=event_log,
+            variant=dfg_visualizer.Variants.FREQUENCY,
+            parameters=parameters,
+        )
 
         return gviz
 
@@ -371,6 +396,9 @@ class PerformanceDFGModel(BaseProcessModel):
         bgcolor: str = "white",
         rankdir: str = "LR",
         max_num_edges: int = 9223372036854775807,
+        *,
+        log: Any | None = None,
+        event_df: pd.DataFrame | None = None,
     ) -> Digraph:
         """
         Gera uma visualização Graphviz do DFG com realce de métricas de performance.
@@ -409,10 +437,22 @@ class PerformanceDFGModel(BaseProcessModel):
             "bgcolor": bgcolor,
             "rankdir": rankdir,
             "maxNoOfEdgesInDiagram": max_num_edges,
+            dfg_parameters.TIMESTAMP_KEY: COLUMN_END_TS,
+            dfg_parameters.START_TIMESTAMP_KEY: COLUMN_START_TS
         }
+
+        event_log = log
+        if event_log is None and event_df is not None and not event_df.empty:
+            try:
+                event_log = pm4py.convert_to_event_log(event_df)
+            except Exception:
+                LOGGER.exception(
+                    "Falha ao converter DataFrame em EventLog para visualização de DFG de performance."
+                )
 
         gviz = dfg_visualizer.apply(
             dfg,
+            log=event_log,
             variant=dfg_visualizer.Variants.PERFORMANCE,
             parameters=parameters,
         )
