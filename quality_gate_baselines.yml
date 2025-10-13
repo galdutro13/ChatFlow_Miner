@@ -1,0 +1,4 @@
+coverage:
+  chatflow_miner.lib: 62.45
+ruff:
+  violation_count: 28

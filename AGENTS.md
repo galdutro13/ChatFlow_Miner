@@ -32,8 +32,61 @@ Automated tests live under tests/ and use **pytest**. New code **must not break 
 pytest -q
 ```
 
-Tests cover filters (tests/lib/filters), aggregations (tests/lib/aggregations), event‑log views (tests/lib/event_log), and process models (tests/lib/process_models). When adding new features, add corresponding tests alongside your code. Aim for at least one unit test per public function and avoid slow, external dependencies in unit tests. Use pytest.mark to distinguish integration tests if needed.
-There is no built‑in linter or type checker; however, follow **PEP 8** conventions and annotate functions with type hints. If you add tooling (e.g. ruff, mypy), document the commands here so other agents can reproduce them locally.
+Tests cover filters (tests/lib/filters), aggregations (tests/lib/aggregations), event-log views (tests/lib/event_log), and process models (tests/lib/process_models). When adding new features, add corresponding tests alongside your code. Aim for at least one unit test per public function and avoid slow, external dependencies in unit tests. Use pytest.mark to distinguish integration tests if needed.
+
+### Quality gates & CI workflow
+Every push and pull request runs the **Quality Gates** workflow (`.github/workflows/quality-gates.yml`). Reproduce it locally before opening a PR:
+
+1. Install dependencies:
+   ```
+   python -m pip install --upgrade pip
+   python -m pip install -r requirements.txt
+   ```
+2. Verify that the reorganised tests are importable:
+   ```
+   python verify_tests.py
+   ```
+3. Execute the targeted coverage suite (produces `coverage.xml`):
+   ```
+   pytest -q tests/lib/filters tests/lib/aggregations tests/lib/event_log tests/lib/process_models \
+     --strict-config --strict-markers -W error \
+     --cov=chatflow_miner.lib --cov-report=xml:coverage.xml --cov-report=term
+   ```
+4. Run the fail-fast test pass for the remaining suite:
+   ```
+   pytest -q --maxfail=1 --strict-config --strict-markers -W error
+   ```
+5. Generate the Ruff report (writes `ruff_report.json`):
+   ```
+   ruff check chatflow_miner tests --output-format json --exit-zero > ruff_report.json
+   ```
+6. Compare the freshly generated reports against the stored baselines:
+   ```
+   python scripts/check_quality_gates.py \
+     --baseline quality_gate_baselines.yml \
+     --coverage coverage.xml \
+     --ruff ruff_report.json
+   ```
+
+The baseline thresholds live in `quality_gate_baselines.yml`:
+
+- `coverage.chatflow_miner.lib`: minimum overall coverage for the `chatflow_miner.lib` package (currently **62.45%**).
+- `ruff.violation_count`: maximum number of Ruff lint findings allowed across `chatflow_miner` and `tests` (currently **28**).
+
+The workflow uploads both `coverage.xml` and `ruff_report.json` as artifacts so reviewers can inspect the raw metrics.
+
+#### Refreshing baselines after improvements
+If you legitimately raise coverage or reduce Ruff violations:
+
+1. Rerun steps 3 and 5 above to create fresh reports that reflect the improved state.
+2. Inspect the new totals:
+   - Coverage: run `python - <<'PY'` with an `xml.etree.ElementTree` parser (see `scripts/check_quality_gates.py`) or reuse that script’s summary output.
+   - Ruff violations: `python -c "import json; print(len(json.load(open('ruff_report.json'))))"`.
+3. Update `quality_gate_baselines.yml` with the improved values (never decrease them).
+4. Commit the updated baseline alongside the code changes so CI enforces the new thresholds going forward.
+
+Temporary artifacts such as `coverage.xml` and `ruff_report.json` are ignored via `.gitignore`, but double-check before committing.
+
 ## Code layout & architecture
 - **chatflow_miner/app/** contains Streamlit entry points (dashboard.py). Only UI logic should live here.
 - **chatflow_miner/lib/** holds pure Python modules for data loading (inputs/dataset.py), state management (state/manager.py), filtering (filters/…), aggregations (aggregations/…), and process models (process_models/…). Keep these modules free of Streamlit calls; they should be deterministic and easy to unit‑test.

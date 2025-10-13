@@ -1,0 +1,59 @@
+name: Quality Gates
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Verify test imports
+        run: python verify_tests.py
+
+      - name: Run targeted coverage suite
+        run: >-
+          pytest -q tests/lib/filters tests/lib/aggregations
+          tests/lib/event_log tests/lib/process_models
+          --strict-config --strict-markers -W error
+          --cov=chatflow_miner.lib --cov-report=xml:coverage.xml --cov-report=term
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+      - name: Run full pytest suite (fail-fast)
+        run: pytest -q --maxfail=1 --strict-config --strict-markers -W error
+
+      - name: Run Ruff lint
+        run: ruff check chatflow_miner tests --output-format json --exit-zero > ruff_report.json
+
+      - name: Upload Ruff report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-report
+          path: ruff_report.json
+
+      - name: Enforce quality gates
+        run: python scripts/check_quality_gates.py --baseline quality_gate_baselines.yml --coverage coverage.xml --ruff ruff_report.json

@@ -5,3 +5,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Coverage and lint artifacts
+.coverage
+coverage.xml
+htmlcov/
+ruff_report.json
+.ruff_cache/
+
+# Virtual environments
+.venv/

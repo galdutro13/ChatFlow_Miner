@@ -3,4 +3,7 @@ pandas
 pm4py==2.7.11.14
 streamlit==1.49.1
 pytest==8.3.5
+pytest-cov==7.0.0
 pulp==2.9.0
+ruff==0.12.11
+pyyaml==6.0.2

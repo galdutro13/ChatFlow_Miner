@@ -1,0 +1,12 @@
+[run]
+source = chatflow_miner/lib
+branch = False
+parallel = False
+
+[report]
+omit =
+    */tests/*
+    */.venv/*
+    */site-packages/*
+show_missing = True
+skip_empty = True
