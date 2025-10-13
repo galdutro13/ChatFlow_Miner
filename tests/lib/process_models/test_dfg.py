@@ -56,15 +56,21 @@ def make_pm4py_stub(discover_return, performance_return=None):
     class _Variants:
         class _FrequencyVariant:
             value = types.SimpleNamespace(Parameters=types.SimpleNamespace(
-                FORMAT="FORMAT", START_ACTIVITIES="START_ACTIVITIES",
-                END_ACTIVITIES="END_ACTIVITIES"
+                FORMAT="FORMAT",
+                START_ACTIVITIES="START_ACTIVITIES",
+                END_ACTIVITIES="END_ACTIVITIES",
+                TIMESTAMP_KEY="TIMESTAMP_KEY",
+                START_TIMESTAMP_KEY="START_TIMESTAMP_KEY",
             ))
 
         FREQUENCY = _FrequencyVariant()
         class _PerformanceVariant:
             value = types.SimpleNamespace(Parameters=types.SimpleNamespace(
-                FORMAT="FORMAT", START_ACTIVITIES="START_ACTIVITIES",
-                END_ACTIVITIES="END_ACTIVITIES"
+                FORMAT="FORMAT",
+                START_ACTIVITIES="START_ACTIVITIES",
+                END_ACTIVITIES="END_ACTIVITIES",
+                TIMESTAMP_KEY="TIMESTAMP_KEY",
+                START_TIMESTAMP_KEY="START_TIMESTAMP_KEY",
             ))
 
         PERFORMANCE = _PerformanceVariant()
