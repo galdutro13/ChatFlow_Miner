@@ -1,3 +1,5 @@
+from typing import Any
+
 import streamlit as st
 import pandas as pd
 
@@ -23,6 +25,82 @@ def filter_section(*, disabled: bool = False):
     event_log_view = filter_by_variants(event_log_view, disabled) or event_log_view
     event_log_view = temporal_filter(event_log_view, disabled) or event_log_view
 
+    selected_model_type = process_model_selector(disabled)
+
+    st.dataframe(event_log_view.compute())
+
+    # Área inferior com botão à direita
+    generate_model(disabled, event_log_view, selected_model_type)
+
+
+def generate_model(disabled: bool, event_log_view: EventLogView | None, selected_model_type):
+    """
+    Gera o modelo de processo quando o botão "Gerar" é acionado na UI do Streamlit.
+
+    Parâmetros:
+        disabled (bool): Se True, o botão de geração é desabilitado.
+        event_log_view (EventLogView | None): A visão do log de eventos a ser usada como base
+            para a geração do modelo. Pode ser None, caso em que a geração pode falhar
+            dependendo da implementação de generate_process_model.
+        selected_model_type (Any): Identificador do tipo de modelo a ser gerado (ex.: "dfg",
+            "performance-dfg", "petri-net").
+
+    Comportamento:
+        - Renderiza um botão na coluna direita da UI. Ao ser clicado:
+            * Exibe um spinner "Gerando modelo...".
+            * Chama generate_process_model(event_log_view, model=selected_model_type).
+            * Armazena o modelo gerado em st.session_state['latest_generated_model'].
+            * Abre um diálogo de visualização/salvamento via show_generated_model_dialog().
+        - Em caso de ValueError, mostra a mensagem de erro ao usuário.
+        - Em caso de exceção genérica, mostra uma mensagem de falha e imprime a exceção.
+
+    Efeitos colaterais:
+        - Modifica st.session_state['latest_generated_model'].
+        - Produz saídas visuais na UI do Streamlit (spinner, mensagens de erro, diálogo).
+
+    Observações:
+        - A função é voltada apenas para execução dentro de um contexto Streamlit (não retorna valor significativo).
+    """
+    _, right_col = st.columns([6, 1])
+    with right_col:
+        if st.button("Gerar", key="filters.generate", disabled=disabled):
+            try:
+                with st.spinner("Gerando modelo..."):
+                    view = generate_process_model(event_log_view, model=selected_model_type)
+                    st.session_state.latest_generated_model = view
+                # Abre diálogo para visualização e salvamento
+                show_generated_model_dialog()
+            except ValueError as exc:
+                st.error(str(exc))
+            except Exception as exc:
+                st.error("Falha ao gerar o modelo de processo.")
+                st.exception(exc)
+
+
+def process_model_selector(disabled: bool) -> Any:
+    """
+    Exibe um seletor de tipo de modelo de processo na interface Streamlit e retorna
+    a opção atualmente selecionada armazenada em `st.session_state`.
+
+    Comportamento:
+    - Inicializa `st.session_state['process_model_type']` com o valor padrão "dfg"
+      caso não exista ou se o valor presente não estiver entre as opções válidas.
+    - Renderiza um controle de rádio (streamlit) com as opções suportadas e
+      um rótulo legível para cada opção.
+
+    Parâmetros:
+        disabled (bool): Se True, desabilita a interação do controle na UI.
+
+    Retorno:
+        Any: A string correspondente ao tipo de modelo selecionado. Valores possíveis:
+            - "dfg": DFG (fluxo de atividades)
+            - "performance-dfg": Performance DFG (DFG de performance)
+            - "petri-net": Petri Net
+
+    Efeitos colaterais:
+    - Modifica `st.session_state['process_model_type']` quando necessário para
+      garantir um valor válido.
+    """
     if "process_model_type" not in st.session_state:
         st.session_state["process_model_type"] = "dfg"
 
@@ -43,24 +121,7 @@ def filter_section(*, disabled: bool = False):
         disabled=disabled,
     )
     selected_model_type = st.session_state["process_model_type"]
-
-    st.dataframe(event_log_view.compute())
-
-    # Área inferior com botão à direita
-    _, right_col = st.columns([6, 1])
-    with right_col:
-        if st.button("Gerar", key="filters.generate", disabled=disabled):
-            try:
-                with st.spinner("Gerando modelo..."):
-                    view = generate_process_model(event_log_view, model=selected_model_type)
-                    st.session_state.latest_generated_model = view
-                # Abre diálogo para visualização e salvamento
-                show_generated_model_dialog()
-            except ValueError as exc:
-                st.error(str(exc))
-            except Exception as exc:
-                st.error("Falha ao gerar o modelo de processo.")
-                st.exception(exc)
+    return selected_model_type
 
 
 def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView | None:
