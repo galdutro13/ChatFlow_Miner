@@ -20,10 +20,11 @@ If pm4py or graphviz fail to install in your environment, see the open questions
 ## Running the app
 Run the Streamlit dashboard locally:
 ```
-streamlit run chatflow_miner/app/dashboard.py
+streamlit run chatflow_miner/app/dashboard.py --global.disableWidgetStateDuplicationWarning=1
 ```
 - By default Streamlit serves on localhost:8501. You can set --server.port to change the port.
 - Use the sidebar button “Carregar log de eventos” to upload a CSV of your chat events. Required columns include CASE_ID, ACTIVITY, START_TIMESTAMP and END_TIMESTAMP. Delimiters are selectable via the UI; timestamps must be parsable by pandas.
+- You can find an example of input inside the root directory of this repository through the file `event_log_example.csv`. Use it whenever you run the app.
 - The **“Modelos de processo”** select box lists all saved models. Selecting the placeholder **“Criar novo modelo de processo…”** exposes the filter panel, allowing you to compose filters before generating a new model.
 ## Tests & quality gates
 Automated tests live under tests/ and use **pytest**. New code **must not break existing tests**. Run the suite from the repo root:
