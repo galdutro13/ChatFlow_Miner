@@ -1,21 +1,26 @@
 from typing import Any
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-from chatflow_miner.lib.state import get_log_eventos
+from chatflow_miner.lib.aggregations import (
+    CaseAggView,
+    CaseDateAggregator,
+    CaseVariantAggregator,
+)
 from chatflow_miner.lib.constants import COLUMN_START_TS
-from chatflow_miner.lib.filters.builtins import AgentFilter, CaseFilter, TimeWindowFilter
 from chatflow_miner.lib.event_log.view import EventLogView
+from chatflow_miner.lib.filters.builtins import (
+    AgentFilter,
+    CaseFilter,
+    TimeWindowFilter,
+)
 from chatflow_miner.lib.process_models.ui import (
     generate_process_model,
     show_generated_model_dialog,
 )
-from chatflow_miner.lib.aggregations import (
-    CaseVariantAggregator,
-    CaseAggView,
-    CaseDateAggregator,
-)
+from chatflow_miner.lib.state import get_log_eventos
+
 
 @st.fragment
 def filter_section(*, disabled: bool = False):
@@ -33,7 +38,9 @@ def filter_section(*, disabled: bool = False):
     generate_model(disabled, event_log_view, selected_model_type)
 
 
-def generate_model(disabled: bool, event_log_view: EventLogView | None, selected_model_type):
+def generate_model(
+    disabled: bool, event_log_view: EventLogView | None, selected_model_type
+):
     """
     Gera o modelo de processo quando o botão "Gerar" é acionado na UI do Streamlit.
 
@@ -66,7 +73,9 @@ def generate_model(disabled: bool, event_log_view: EventLogView | None, selected
         if st.button("Gerar", key="filters.generate", disabled=disabled):
             try:
                 with st.spinner("Gerando modelo..."):
-                    view = generate_process_model(event_log_view, model=selected_model_type)
+                    view = generate_process_model(
+                        event_log_view, model=selected_model_type
+                    )
                     st.session_state.latest_generated_model = view
                 # Abre diálogo para visualização e salvamento
                 show_generated_model_dialog()
@@ -143,24 +152,27 @@ def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView
 
     def gid(key: str) -> str:
         return getattr(result[key], "variant_id", key)
+
     seen = set()
     variants = [v for v in result if (vid := gid(v)) not in seen and not seen.add(vid)]
     variants.sort(key=lambda v: result[v].frequency, reverse=True)
+
     def fmt(variant_key: str) -> str:
         return (
             f"freq={result[variant_key].frequency} | "
             f"{result[variant_key].variant_id} | "
             f"{result[variant_key].variant}"
         )
-    selected = st.multiselect("Filtro de VARIANTE", variants, [], format_func=fmt,
-                              disabled=disabled)
+
+    selected = st.multiselect(
+        "Filtro de VARIANTE", variants, [], format_func=fmt, disabled=disabled
+    )
     if selected:
         cid = {gid(v) for v in selected}
         ks = [k for k in result if gid(k) in cid]
         if ks:
             return event_view.filter(CaseFilter(case_ids=ks))
     return event_view
-
 
 
 def filter_by_agents(disabled: bool) -> EventLogView:
@@ -174,12 +186,19 @@ def filter_by_agents(disabled: bool) -> EventLogView:
         EventLogView: Um EventLogView filtrado pelo agente selecionado ('chatbot', 'cliente' ou 'ambos').
     """
     sel = st.segmented_control(
-        "Filtro de AGENTE", ["chatbot", "cliente", "ambos"],
-        selection_mode="single", default="ambos", disabled=disabled)
-    df = (d if (d := get_log_eventos(which="log_eventos")) is not None else pd.DataFrame())
+        "Filtro de AGENTE",
+        ["chatbot", "cliente", "ambos"],
+        selection_mode="single",
+        default="ambos",
+        disabled=disabled,
+    )
+    df = (
+        d if (d := get_log_eventos(which="log_eventos")) is not None else pd.DataFrame()
+    )
     view = EventLogView(base_df=df)
     agent = {"chatbot": "ai", "cliente": "human"}.get(sel)
     return view.filter(AgentFilter(agent=agent)) if agent else view
+
 
 def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | None:
     """
@@ -216,27 +235,43 @@ def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | 
         col1, col2 = st.columns(2)
         for lbl, val, col in [("Data inicial", 1970, col1), ("Data final", 2025, col2)]:
             with col:
-                st.select_slider(lbl, options=[1970, 1997, 2025], value=val, disabled=disabled)
+                st.select_slider(
+                    lbl, options=[1970, 1997, 2025], value=val, disabled=disabled
+                )
         return None
 
     date_options = sorted(
-        {d for d in CaseAggView(base_df=df)
-        .with_aggregator(CaseDateAggregator())
-        .compute()
-        .values() if d}
+        {
+            d
+            for d in CaseAggView(base_df=df)
+            .with_aggregator(CaseDateAggregator())
+            .compute()
+            .values()
+            if d
+        }
     )
 
     col1, col2 = st.columns(2)
     with col1:
-        start_date = st.select_slider("Data inicial", date_options, date_options[0], disabled=disabled)
+        start_date = st.select_slider(
+            "Data inicial", date_options, date_options[0], disabled=disabled
+        )
     with col2:
-        end_date = st.select_slider("Data final", date_options, date_options[-1], disabled=disabled)
+        end_date = st.select_slider(
+            "Data final", date_options, date_options[-1], disabled=disabled
+        )
 
     if end_date < start_date:
-        st.error("Falha ao gerar o filtro temporal: a data final não pode ser anterior à data inicial.")
+        st.error(
+            "Falha ao gerar o filtro temporal: a data final não pode ser anterior à data inicial."
+        )
 
     start_ts = pd.to_datetime(start_date).normalize()
-    end_ts = pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+    end_ts = (
+        pd.to_datetime(end_date).normalize()
+        + pd.Timedelta(days=1)
+        - pd.Timedelta(microseconds=1)
+    )
 
     series = df.get(COLUMN_START_TS)
     if series is not None and pd.api.types.is_datetime64tz_dtype(series.dtype):

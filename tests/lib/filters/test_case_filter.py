@@ -1,15 +1,17 @@
 import pandas as pd
 import pytest
 
-from chatflow_miner.lib.filters.builtins import CaseFilter
 from chatflow_miner.lib.constants import COLUMN_CASE_ID
+from chatflow_miner.lib.filters.builtins import CaseFilter
 
 
 def make_df(case_ids):
-    return pd.DataFrame({
-        COLUMN_CASE_ID: case_ids,
-        "value": range(len(case_ids)),
-    })
+    return pd.DataFrame(
+        {
+            COLUMN_CASE_ID: case_ids,
+            "value": range(len(case_ids)),
+        }
+    )
 
 
 def test_case_filter_keeps_matching_cases():
@@ -45,4 +47,3 @@ def test_case_filter_raises_when_missing_column():
     filt = CaseFilter(["a"])
     with pytest.raises(Exception):
         filt.mask(df)
-

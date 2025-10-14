@@ -80,5 +80,3 @@ def snap_registry(patch_registry_process_model_view):
     from chatflow_miner.lib.process_models.model_registry import ProcessModelRegistry
 
     return ProcessModelRegistry(cache_snapshots=True)
-
-

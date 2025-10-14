@@ -83,9 +83,7 @@ def main() -> int:
     args = parse_args()
     baselines = load_baselines(args.baseline)
 
-    expected_coverage = (
-        baselines.get("coverage", {}).get("chatflow_miner.lib")
-    )
+    expected_coverage = baselines.get("coverage", {}).get("chatflow_miner.lib")
     expected_violations = baselines.get("ruff", {}).get("violation_count")
 
     if expected_coverage is None:

@@ -1,16 +1,21 @@
 import types
+
 import pandas as pd
+
+
 class TempModulePatcher:
     """
     Context manager to temporarily inject/patch entries in sys.modules.
     Avoids importing heavy deps like pm4py/graphviz in unit tests.
     """
+
     def __init__(self, mapping):
         self.mapping = mapping
         self._originals = {}
 
     def __enter__(self):
         import sys
+
         for name, module in self.mapping.items():
             self._originals[name] = sys.modules.get(name)
             sys.modules[name] = module
@@ -18,6 +23,7 @@ class TempModulePatcher:
 
     def __exit__(self, exc_type, exc, tb):
         import sys
+
         for name in self.mapping.keys():
             if self._originals[name] is None and name in sys.modules:
                 del sys.modules[name]
@@ -34,13 +40,14 @@ def make_pm4py_stub(discover_return, performance_return=None):
         return discover_return
 
     pm4py.discover_dfg = discover_dfg
-    
+
     def discover_performance_dfg(df):
         if performance_return is not None:
             return performance_return
         return discover_return
 
     pm4py.discover_performance_dfg = discover_performance_dfg
+
     def convert_to_event_log(df):
         return {"converted_df": df}
 
@@ -52,23 +59,28 @@ def make_pm4py_stub(discover_return, performance_return=None):
 
     class _Variants:
         class _FrequencyVariant:
-            value = types.SimpleNamespace(Parameters=types.SimpleNamespace(
-                FORMAT="FORMAT",
-                START_ACTIVITIES="START_ACTIVITIES",
-                END_ACTIVITIES="END_ACTIVITIES",
-                TIMESTAMP_KEY="TIMESTAMP_KEY",
-                START_TIMESTAMP_KEY="START_TIMESTAMP_KEY",
-            ))
+            value = types.SimpleNamespace(
+                Parameters=types.SimpleNamespace(
+                    FORMAT="FORMAT",
+                    START_ACTIVITIES="START_ACTIVITIES",
+                    END_ACTIVITIES="END_ACTIVITIES",
+                    TIMESTAMP_KEY="TIMESTAMP_KEY",
+                    START_TIMESTAMP_KEY="START_TIMESTAMP_KEY",
+                )
+            )
 
         FREQUENCY = _FrequencyVariant()
+
         class _PerformanceVariant:
-            value = types.SimpleNamespace(Parameters=types.SimpleNamespace(
-                FORMAT="FORMAT",
-                START_ACTIVITIES="START_ACTIVITIES",
-                END_ACTIVITIES="END_ACTIVITIES",
-                TIMESTAMP_KEY="TIMESTAMP_KEY",
-                START_TIMESTAMP_KEY="START_TIMESTAMP_KEY",
-            ))
+            value = types.SimpleNamespace(
+                Parameters=types.SimpleNamespace(
+                    FORMAT="FORMAT",
+                    START_ACTIVITIES="START_ACTIVITIES",
+                    END_ACTIVITIES="END_ACTIVITIES",
+                    TIMESTAMP_KEY="TIMESTAMP_KEY",
+                    START_TIMESTAMP_KEY="START_TIMESTAMP_KEY",
+                )
+            )
 
         PERFORMANCE = _PerformanceVariant()
 
@@ -119,6 +131,7 @@ def test_dfgmodel_compute_returns_pm4py_discover_output():
     }
     with TempModulePatcher(mapping):
         from chatflow_miner.lib.process_models.dfg import DFGModel
+
         model = DFGModel()
         result = model.compute(df)
 
@@ -145,9 +158,12 @@ def test_dfgmodel_to_graphviz_returns_visualizer_output_structure():
     }
     with TempModulePatcher(mapping):
         from chatflow_miner.lib.process_models.dfg import DFGModel
+
         model = DFGModel()
         computed = model.compute(df)
-        gviz = model.to_graphviz(computed, bgcolor="black", rankdir="TB", max_num_edges=5)
+        gviz = model.to_graphviz(
+            computed, bgcolor="black", rankdir="TB", max_num_edges=5
+        )
 
     # gviz should be the object returned by our stub apply()
     assert getattr(gviz, "kind", None) == "gviz"

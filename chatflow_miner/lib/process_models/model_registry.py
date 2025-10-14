@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+from collections.abc import (
+    ItemsView,
+    Iterable,
+    Iterator,
+    KeysView,
+    Mapping,
+    MutableMapping,
+    ValuesView,
+)
 from dataclasses import dataclass, field
-from collections.abc import Iterable, Iterator, ItemsView, KeysView, Mapping, MutableMapping, ValuesView
 from types import MappingProxyType
 from typing import Any, Literal, Optional
 
 # If ProcessModelView is defined elsewhere, import it here:
 from .view import ProcessModelView
+
 
 @dataclass(slots=True)
 class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
@@ -30,16 +39,20 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
 
     cache_snapshots: bool = False
 
-    _data: dict[str, Optional[ProcessModelView]] = field(default_factory=dict, init=False, repr=False)
+    _data: dict[str, ProcessModelView | None] = field(
+        default_factory=dict, init=False, repr=False
+    )
     _names_cache: tuple[str, ...] | None = field(default=None, init=False, repr=False)
-    _values_cache: tuple[Optional[ProcessModelView], ...] | None = field(default=None, init=False, repr=False)
+    _values_cache: tuple[ProcessModelView | None, ...] | None = field(
+        default=None, init=False, repr=False
+    )
 
     # --- Core MutableMapping interface ---
 
-    def __getitem__(self, key: str) -> Optional[ProcessModelView]:
+    def __getitem__(self, key: str) -> ProcessModelView | None:
         return self._data[key]
 
-    def __setitem__(self, key: str, value: Optional[ProcessModelView]) -> None:
+    def __setitem__(self, key: str, value: ProcessModelView | None) -> None:
         self._validate_name(key)
         if value is None:
             # Bloqueia criação de placeholders via atribuição direta.
@@ -73,11 +86,11 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
         return self._data.keys()
 
     @property
-    def values_view(self) -> ValuesView[Optional[ProcessModelView]]:
+    def values_view(self) -> ValuesView[ProcessModelView | None]:
         """View dinâmica dos valores: ProcessModelView ou None (placeholder)."""
         return self._data.values()
 
-    def items(self) -> ItemsView[str, Optional[ProcessModelView]]:
+    def items(self) -> ItemsView[str, ProcessModelView | None]:
         """View dinâmica de (nome, view|None) (sem cópia)."""
         return self._data.items()
 
@@ -87,7 +100,7 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
         """Lista materializada de nomes."""
         return list(self._data.keys())
 
-    def values_list(self) -> list[Optional[ProcessModelView]]:
+    def values_list(self) -> list[ProcessModelView | None]:
         """Lista materializada de valores: ProcessModelView ou None."""
         return list(self._data.values())
 
@@ -100,7 +113,7 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
             self._names_cache = tup
         return tup
 
-    def values_tuple(self) -> tuple[Optional[ProcessModelView], ...]:
+    def values_tuple(self) -> tuple[ProcessModelView | None, ...]:
         """Tupla de valores; cacheada se cache_snapshots=True."""
         if self.cache_snapshots and self._values_cache is not None:
             return self._values_cache
@@ -114,7 +127,7 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
     def add(
         self,
         name: str,
-        view: Optional[ProcessModelView] = None,
+        view: ProcessModelView | None = None,
         *,
         overwrite: bool = False,
     ) -> None:
@@ -133,7 +146,9 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
             raise KeyError(f"'{name}' já existe no registry.")
 
         if view is None:
-            if len(self._data) == 0 or (overwrite and name in self._data and len(self._data) == 1):
+            if len(self._data) == 0 or (
+                overwrite and name in self._data and len(self._data) == 1
+            ):
                 # Permite placeholder somente como primeira entrada no registry vazio.
                 # Obs.: a condição com overwrite cobre o caso de re-adicionar o mesmo nome
                 # como placeholder quando o único item já é esse nome.
@@ -151,7 +166,10 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
 
     def add_many(
         self,
-        entries: Mapping[str, Optional[ProcessModelView]] | Iterable[tuple[str, Optional[ProcessModelView]]],
+        entries: (
+            Mapping[str, ProcessModelView | None]
+            | Iterable[tuple[str, ProcessModelView | None]]
+        ),
         *,
         overwrite: bool = False,
     ) -> None:
@@ -181,7 +199,7 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
         for name, view in pairs:
             self.add(name, view, overwrite=overwrite)
 
-    def remove(self, name: str) -> Optional[ProcessModelView]:
+    def remove(self, name: str) -> ProcessModelView | None:
         """Remove e retorna a view associada a 'name' (ou None, se placeholder)."""
         value = self._data.pop(name)
         self._invalidate_cache()
@@ -206,7 +224,7 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
         names: Iterable[str],
         *,
         missing: Literal["error", "skip", "none"] = "error",
-    ) -> list[Optional[ProcessModelView]]:
+    ) -> list[ProcessModelView | None]:
         """
         Busca várias views por nome.
 
@@ -215,7 +233,7 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
           - 'skip': ignora nomes ausentes.
           - 'none': coloca None nas posições ausentes.
         """
-        out: list[Optional[ProcessModelView]] = []
+        out: list[ProcessModelView | None] = []
         if missing == "error":
             for n in names:
                 out.append(self._data[n])
@@ -245,11 +263,15 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
           - 'none': associa None às entradas que falharem ou que sejam placeholders.
         """
         result: dict[str, Any] = {}
-        it = self._data.items() if names is None else ((n, self._data[n]) for n in names)
+        it = (
+            self._data.items() if names is None else ((n, self._data[n]) for n in names)
+        )
         for name, view in it:
             if view is None:
                 if on_error == "raise":
-                    raise ValueError(f"A entrada '{name}' não possui view associada (placeholder).")
+                    raise ValueError(
+                        f"A entrada '{name}' não possui view associada (placeholder)."
+                    )
                 elif on_error == "skip":
                     continue
                 elif on_error == "none":
@@ -287,11 +309,15 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
           - 'none': associa None às entradas que falharem ou que sejam placeholders.
         """
         viz: dict[str, Any] = {}
-        it = self._data.items() if names is None else ((n, self._data[n]) for n in names)
+        it = (
+            self._data.items() if names is None else ((n, self._data[n]) for n in names)
+        )
         for name, view in it:
             if view is None:
                 if on_error == "raise":
-                    raise ValueError(f"A entrada '{name}' não possui view associada (placeholder).")
+                    raise ValueError(
+                        f"A entrada '{name}' não possui view associada (placeholder)."
+                    )
                 elif on_error == "skip":
                     continue
                 elif on_error == "none":
@@ -315,7 +341,7 @@ class ProcessModelRegistry(MutableMapping[str, Optional[ProcessModelView]]):
 
     # --- Safety / sharing ---
 
-    def freeze(self) -> Mapping[str, Optional[ProcessModelView]]:
+    def freeze(self) -> Mapping[str, ProcessModelView | None]:
         """
         Retorna uma visão de mapeamento somente leitura. Mutations no registry
         se refletem aqui, mas o mapeamento retornado é imutável para o chamador.

@@ -52,7 +52,9 @@ def test_performance_dfgmodel_to_graphviz_uses_performance_variant():
         {"B": {"sojourn": 0.1}},
     )
 
-    pm4py_stub = make_pm4py_stub(performance_tuple, performance_return=performance_tuple)
+    pm4py_stub = make_pm4py_stub(
+        performance_tuple, performance_return=performance_tuple
+    )
     graphviz_stub = make_graphviz_stub()
 
     mapping = {
@@ -71,7 +73,9 @@ def test_performance_dfgmodel_to_graphviz_uses_performance_variant():
 
         model = PerformanceDFGModel()
         computed = model.compute(df)
-        gviz = model.to_graphviz(computed, bgcolor="navy", rankdir="TB", max_num_edges=3)
+        gviz = model.to_graphviz(
+            computed, bgcolor="navy", rankdir="TB", max_num_edges=3
+        )
 
     assert getattr(gviz, "kind", None) == "gviz"
     params = getattr(gviz, "params", {})

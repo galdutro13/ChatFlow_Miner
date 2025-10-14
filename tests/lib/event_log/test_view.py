@@ -1,5 +1,6 @@
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 from chatflow_miner.lib.event_log.view import EventLogView
 from chatflow_miner.lib.filters.builtins import AgentFilter
@@ -14,10 +15,12 @@ def test_event_log_view_compute_without_filters_returns_copy_and_equal():
 
 
 def test_event_log_view_filter_is_immutable_and_combines_filters_and_compute_applies_all():
-    df = pd.DataFrame({
-        "CASE_ID": [1, 1, 2, 3],
-        "AGENTE": ["AI", "human", "AI", "syst"],
-    })
+    df = pd.DataFrame(
+        {
+            "CASE_ID": [1, 1, 2, 3],
+            "AGENTE": ["AI", "human", "AI", "syst"],
+        }
+    )
     view = EventLogView(df)
 
     f1 = AgentFilter("ai")
@@ -40,10 +43,12 @@ def test_event_log_view_filter_is_immutable_and_combines_filters_and_compute_app
 
 
 def test_event_log_view_filter_accepts_sequence_of_filters_and_applies_all():
-    df = pd.DataFrame({
-        "CASE_ID": [1, 1, 2, 2],
-        "AGENTE": ["AI", "human", "AI", "AI"],
-    })
+    df = pd.DataFrame(
+        {
+            "CASE_ID": [1, 1, 2, 2],
+            "AGENTE": ["AI", "human", "AI", "AI"],
+        }
+    )
     view = EventLogView(df)
     f_list = [AgentFilter("ai", include_syst=False), AgentFilter("ai")]
     new_view = view.filter(f_list)

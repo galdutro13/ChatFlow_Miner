@@ -1,4 +1,5 @@
 """Data models for aggregations."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,4 +20,3 @@ class VariantInfo:
     variant: str
     frequency: int
     length: int
-

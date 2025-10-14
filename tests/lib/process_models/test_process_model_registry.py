@@ -1,6 +1,5 @@
 import pytest
 
-
 # -------- Core mapping behavior --------
 
 
@@ -68,7 +67,9 @@ def test_placeholder_only_first_insert_and_readd_same_single_with_overwrite(regi
     assert registry["p"] is None
 
 
-def test_placeholder_otherwise_rejected_and_setitem_none_always_typeerror(registry, make_stub_view):
+def test_placeholder_otherwise_rejected_and_setitem_none_always_typeerror(
+    registry, make_stub_view
+):
     """Any add(name,None) beyond first must raise ValueError; __setitem__(k,None) always TypeError."""
     registry.add("p", None)
     with pytest.raises(ValueError):
@@ -129,7 +130,9 @@ def test_add_many_accepts_single_placeholder_only_when_empty(registry, as_mappin
         lambda mv: [("a", mv()), ("b", mv())],
     ],
 )
-def test_add_many_delegates_to_add_and_inserts(registry, make_stub_view, entries_builder):
+def test_add_many_delegates_to_add_and_inserts(
+    registry, make_stub_view, entries_builder
+):
     """When no placeholders, add_many adds all entries from mapping or iterable."""
     entries = entries_builder(make_stub_view)
     registry.add_many(entries)
@@ -146,7 +149,9 @@ def test_add_many_delegates_to_add_and_inserts(registry, make_stub_view, entries
         [("a", None), ("b", object())],
     ],
 )
-def test_add_many_rejects_multiple_or_mixed_placeholders_or_non_empty(registry, entries):
+def test_add_many_rejects_multiple_or_mixed_placeholders_or_non_empty(
+    registry, entries
+):
     """Any batch with more than one None or mixed or non-empty registry must raise ValueError."""
     # non-empty + any None is invalid too
     with pytest.raises(ValueError):
@@ -234,7 +239,9 @@ def test_get_many_behaviors(registry, make_stub_view, missing_mode):
 
 
 @pytest.mark.parametrize("on_error", ["raise", "skip", "none"])
-def test_compute_map_placeholder_and_exception_paths(registry, make_stub_view, on_error):
+def test_compute_map_placeholder_and_exception_paths(
+    registry, make_stub_view, on_error
+):
     """compute_map respects on_error for placeholders and compute exceptions; subset names pass-through."""
     ok = make_stub_view(compute_return=10)
     bad = make_stub_view(compute_exc=RuntimeError("boom"))
@@ -260,7 +267,12 @@ def test_compute_map_placeholder_and_exception_paths(registry, make_stub_view, o
         assert set(res_subset.keys()) == {"ok"}
     else:  # none
         res_all = registry.compute_map(on_error=on_error)
-        assert res_all.get("p") is None and res_all.get("ok") == 10 and "bad" in res_all and res_all["bad"] is None
+        assert (
+            res_all.get("p") is None
+            and res_all.get("ok") == 10
+            and "bad" in res_all
+            and res_all["bad"] is None
+        )
 
         res_subset = registry.compute_map(names=subset, on_error=on_error)
         assert res_subset == {"ok": 10, "bad": None}
@@ -273,7 +285,9 @@ def test_compute_map_placeholder_and_exception_paths(registry, make_stub_view, o
 
 
 @pytest.mark.parametrize("on_error", ["raise", "skip", "none"])
-def test_to_graphviz_map_mirrors_compute_and_forwards_kwargs(registry, make_stub_view, on_error):
+def test_to_graphviz_map_mirrors_compute_and_forwards_kwargs(
+    registry, make_stub_view, on_error
+):
     """to_graphviz_map mirrors error handling and forwards kwargs to view.to_graphviz."""
     g_ok = object()
     ok = make_stub_view(graphviz_return=g_ok)
@@ -346,7 +360,9 @@ def test_tuple_snapshots_without_cache_are_rebuilt_each_call(registry, make_stub
     assert t1n != t2n and t1v != t2v
 
 
-def test_tuple_snapshots_with_cache_invalidate_on_mutations(snap_registry, make_stub_view):
+def test_tuple_snapshots_with_cache_invalidate_on_mutations(
+    snap_registry, make_stub_view
+):
     """When cache_snapshots=True, tuples are cached until any mutation; invalidate on set, delete, rename, clear."""
     r = snap_registry
     r.add("a", make_stub_view())
@@ -423,5 +439,3 @@ def test_has_placeholder_transitions_and_clear(registry, make_stub_view):
     registry.clear()
     assert len(registry) == 0
     assert registry.names_tuple() == () and registry.values_tuple() == ()
-
-

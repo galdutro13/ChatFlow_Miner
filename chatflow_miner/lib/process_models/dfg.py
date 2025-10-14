@@ -1,21 +1,21 @@
-from typing import Any, Dict, Tuple
-import math
 import logging
+import math
+from typing import Any, Dict, Tuple
 
 import pandas as pd
 import pm4py
 from graphviz import Digraph
 
-from .base import BaseProcessModel
-from chatflow_miner.lib.constants import COLUMN_START_TS, COLUMN_END_TS
+from chatflow_miner.lib.constants import COLUMN_END_TS, COLUMN_START_TS
 
+from .base import BaseProcessModel
 
 LOGGER = logging.getLogger(__name__)
 
 
 def _quality_metrics_for_dfg(
-        df: "pd.DataFrame",
-        model: "Tuple[dict, dict, dict]",
+    df: "pd.DataFrame",
+    model: "Tuple[dict, dict, dict]",
 ) -> "Dict[str, float | None]":
     """
     Calcula métricas de qualidade para um DFG convertendo-o para rede de Petri
@@ -59,6 +59,7 @@ def _quality_metrics_for_dfg(
         from pm4py.objects.conversion.dfg.variants import (
             to_petri_net_activity_defines_place as dfg_to_petri,
         )
+
         dfg_graph, start_activities, end_activities = model
         conv_params = {
             dfg_to_petri.Parameters.START_ACTIVITIES: start_activities,
@@ -80,30 +81,39 @@ def _quality_metrics_for_dfg(
     # 2) Imports dos avaliadores (compatíveis com mudanças de API)
     # ---------------------------
     try:
-        from pm4py.algo.evaluation.replay_fitness import algorithm as rf_algorithm
-        from pm4py.algo.evaluation.precision import algorithm as prec_algorithm
         from pm4py.algo.evaluation.generalization import algorithm as gen_algorithm
+        from pm4py.algo.evaluation.precision import algorithm as prec_algorithm
+        from pm4py.algo.evaluation.replay_fitness import algorithm as rf_algorithm
         from pm4py.algo.evaluation.simplicity import algorithm as simp_algorithm
     except Exception:
         # PM4Py em versões antigas/mudanças de pacote
-        from pm4py.evaluation import replay_fitness as rf_algorithm  # type: ignore
-        from pm4py.evaluation import precision as prec_algorithm  # type: ignore
         from pm4py.evaluation import generalization as gen_algorithm  # type: ignore
+        from pm4py.evaluation import precision as prec_algorithm  # type: ignore
+        from pm4py.evaluation import replay_fitness as rf_algorithm  # type: ignore
         from pm4py.evaluation import simplicity as simp_algorithm  # type: ignore
 
     # Para reutilizar alinhamentos e derivar fitness a partir deles
     try:
-        from pm4py.evaluation.replay_fitness.variants import alignment_based as rf_align_eval  # type: ignore
+        from pm4py.evaluation.replay_fitness.variants import (
+            alignment_based,
+        )  # type: ignore
+
+        _ = alignment_based  # noqa: F841
     except Exception:
         try:
-            from pm4py.algo.evaluation.replay_fitness.variants import \
-                alignment_based as rf_align_eval  # type: ignore
-        except Exception:
-            rf_align_eval = None  # sem reuso de alinhamentos (degradaremos graciosamente)
+            from pm4py.algo.evaluation.replay_fitness.variants import (
+                alignment_based,
+            )  # type: ignore
 
+            _ = alignment_based  # noqa: F841
+        except Exception:
+            LOGGER.debug(
+                "Reuso de alinhamentos indisponível; degradaremos graciosamente."
+            )
+
+    import pm4py
     from pm4py.util import constants as pm_constants
     from pm4py.util import xes_constants
-    import pm4py
 
     # ---------------------------
     # 3) Utilitários
@@ -180,7 +190,9 @@ def _quality_metrics_for_dfg(
             parameters=eval_params,
             variant=getattr(rf_algorithm, "Variants").TOKEN_BASED,
         )
-        fitness_val = fitness_res.get("log_fitness") or fitness_res.get("average_trace_fitness")
+        fitness_val = fitness_res.get("log_fitness") or fitness_res.get(
+            "average_trace_fitness"
+        )
         metrics["fitness"] = _safe_number(fitness_val)
     except Exception:
         LOGGER.exception(
@@ -188,7 +200,6 @@ def _quality_metrics_for_dfg(
             "Se necessário, tentaremos derivar via alinhamentos."
         )
 
-    precision_ok = False
     try:
         prec_val = prec_algorithm.apply(
             event_log if event_log is not None else df,
@@ -199,16 +210,12 @@ def _quality_metrics_for_dfg(
             variant=getattr(prec_algorithm, "Variants").ETCONFORMANCE_TOKEN,
         )
         metrics["precision"] = _safe_number(prec_val)
-        precision_ok = metrics["precision"] is not None
     except Exception:
         LOGGER.exception(
             "Falha ao calcular precision (ETConformance token-based) para o modelo DFG."
         )
-        precision_ok = False
 
     return metrics
-
-
 
 
 class DFGModel(BaseProcessModel):
@@ -222,7 +229,7 @@ class DFGModel(BaseProcessModel):
     que pode ser posteriormente visualizada ou analisada.
     """
 
-    def compute(self, df: pd.DataFrame) -> Tuple[dict, dict, dict]:
+    def compute(self, df: pd.DataFrame) -> tuple[dict, dict, dict]:
         """
         Constrói o Directly-Follows Graph (DFG) a partir do DataFrame de eventos.
 
@@ -235,7 +242,7 @@ class DFGModel(BaseProcessModel):
 
     def to_graphviz(
         self,
-        model: Tuple[dict, dict, dict],
+        model: tuple[dict, dict, dict],
         bgcolor: str = "white",
         rankdir: str = "LR",
         max_num_edges: int = 9223372036854775807,
@@ -259,10 +266,16 @@ class DFGModel(BaseProcessModel):
         dfg_parameters = dfg_visualizer.Variants.FREQUENCY.value.Parameters
         # Corrige: não passar a builtin `format` (função) — é esperado um string com o formato de imagem.
         # Usar 'svg' ou 'png' ou 'html' conforme suporte do Graphviz/pm4py.
-        parameters = {dfg_parameters.FORMAT: "svg", dfg_parameters.START_ACTIVITIES: start_activities,
-                      dfg_parameters.END_ACTIVITIES: end_activities, "bgcolor": bgcolor, "rankdir": rankdir,
-                      "maxNoOfEdgesInDiagram": max_num_edges, dfg_parameters.TIMESTAMP_KEY: COLUMN_END_TS,
-                      dfg_parameters.START_TIMESTAMP_KEY: COLUMN_START_TS}
+        parameters = {
+            dfg_parameters.FORMAT: "svg",
+            dfg_parameters.START_ACTIVITIES: start_activities,
+            dfg_parameters.END_ACTIVITIES: end_activities,
+            "bgcolor": bgcolor,
+            "rankdir": rankdir,
+            "maxNoOfEdgesInDiagram": max_num_edges,
+            dfg_parameters.TIMESTAMP_KEY: COLUMN_END_TS,
+            dfg_parameters.START_TIMESTAMP_KEY: COLUMN_START_TS,
+        }
 
         event_log = log
         if event_log is None and event_df is not None and not event_df.empty:
@@ -283,9 +296,9 @@ class DFGModel(BaseProcessModel):
         return gviz
 
     def quality_metrics(
-            self,
-            df: "pd.DataFrame",
-            model: "Tuple[dict, dict, dict]",
+        self,
+        df: "pd.DataFrame",
+        model: "Tuple[dict, dict, dict]",
     ) -> "Dict[str, float | None]":
         """Delegates to the shared DFG quality-metrics implementation."""
         return _quality_metrics_for_dfg(df, model)
@@ -309,7 +322,7 @@ class PerformanceDFGModel(BaseProcessModel):
       atividades, além da estrutura diretamente sequencial do processo.
     """
 
-    def compute(self, df: pd.DataFrame) -> Tuple[dict, dict, dict]:
+    def compute(self, df: pd.DataFrame) -> tuple[dict, dict, dict]:
         """
         Constrói o Directly-Follows Graph (DFG) orientado a performance.
 
@@ -329,12 +342,14 @@ class PerformanceDFGModel(BaseProcessModel):
             - start_activities: dicionário/estrutura com atividades iniciais.
             - end_activities: dicionário/estrutura com atividades finais.
         """
-        dfg, start_activity, end_activity = pm4py.discover_performance_dfg(df, )
+        dfg, start_activity, end_activity = pm4py.discover_performance_dfg(
+            df,
+        )
         return dfg, start_activity, end_activity
 
     def to_graphviz(
         self,
-        model: Tuple[dict, dict, dict],
+        model: tuple[dict, dict, dict],
         bgcolor: str = "white",
         rankdir: str = "LR",
         max_num_edges: int = 9223372036854775807,
@@ -380,7 +395,7 @@ class PerformanceDFGModel(BaseProcessModel):
             "rankdir": rankdir,
             "maxNoOfEdgesInDiagram": max_num_edges,
             dfg_parameters.TIMESTAMP_KEY: COLUMN_END_TS,
-            dfg_parameters.START_TIMESTAMP_KEY: COLUMN_START_TS
+            dfg_parameters.START_TIMESTAMP_KEY: COLUMN_START_TS,
         }
 
         event_log = log
@@ -402,9 +417,9 @@ class PerformanceDFGModel(BaseProcessModel):
         return gviz
 
     def quality_metrics(
-            self,
-            df: "pd.DataFrame",
-            model: "Tuple[dict, dict, dict]",
+        self,
+        df: "pd.DataFrame",
+        model: "Tuple[dict, dict, dict]",
     ) -> "Dict[str, float | None]":
         """
         Calcula métricas de qualidade do modelo DFG (fitness, precision, etc.).

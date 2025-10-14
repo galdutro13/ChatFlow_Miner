@@ -2,7 +2,7 @@ from __future__ import annotations
 
 # Expor apenas filtros aqui. NÃO importe streamlit_fragments aqui
 # para evitar ciclo de import (pois ele importa estado e dialog UI).
-from .builtins import AgentFilter, CaseHasActivityFilter, TimeWindowFilter, CaseFilter
+from .builtins import AgentFilter, CaseFilter, CaseHasActivityFilter, TimeWindowFilter
 
 __all__ = [
     "AgentFilter",
@@ -10,4 +10,3 @@ __all__ = [
     "TimeWindowFilter",
     "CaseFilter",
 ]
-

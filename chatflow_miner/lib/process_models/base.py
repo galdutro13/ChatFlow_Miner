@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from typing import Any
+
 import pandas as pd
+
 
 class BaseProcessModel:
     """
@@ -27,9 +29,7 @@ class BaseProcessModel:
         """
         raise NotImplementedError("Subclasses devem implementar compute()")
 
-    def to_graphviz(
-        self, model: Any, log: Any | None = None, **kwargs: Any
-    ) -> Any:
+    def to_graphviz(self, model: Any, log: Any | None = None, **kwargs: Any) -> Any:
         """
         Para modelos que suportam visualização via Graphviz (por exemplo DFG), este
         método pode ser sobrescrito para gerar a figura.
@@ -43,13 +43,9 @@ class BaseProcessModel:
         :returns: Objeto de figura ou visualização.
         :raises NotImplementedError: se o modelo não suporta visualização.
         """
-        raise NotImplementedError(
-            "Este modelo não implementa visualização Graphviz"
-        )
+        raise NotImplementedError("Este modelo não implementa visualização Graphviz")
 
-    def quality_metrics(
-        self, df: pd.DataFrame, model: Any
-    ) -> dict[str, float | None]:
+    def quality_metrics(self, df: pd.DataFrame, model: Any) -> dict[str, float | None]:
         """
         Calcula métricas de qualidade associadas ao modelo de processo gerado.
 
@@ -62,6 +58,4 @@ class BaseProcessModel:
         :returns: Dicionário contendo métricas de qualidade do modelo.
         :raises NotImplementedError: se não implementado em subclasses.
         """
-        raise NotImplementedError(
-            "Subclasses devem implementar quality_metrics()"
-        )
+        raise NotImplementedError("Subclasses devem implementar quality_metrics()")

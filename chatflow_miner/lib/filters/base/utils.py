@@ -2,6 +2,7 @@ import pandas as pd
 
 from .exceptions import FilterError
 
+
 def _ensure_bool_series(mask: pd.Series, df: pd.DataFrame) -> None:
     """Garante que a série ``mask`` seja booleana e alinhada ao ``df``.
 

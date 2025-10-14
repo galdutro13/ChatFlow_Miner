@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Sequence
-import pandas as pd
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from .utils import _ensure_bool_series
+import pandas as pd
+
 from .exceptions import MissingColumnsError
+from .utils import _ensure_bool_series
+
 
 # -----------------------------------------------------------------------------
 # BaseFilter: protocolo / classe base para todos os filtros
@@ -55,14 +57,15 @@ class BaseFilter(ABC):
             raise MissingColumnsError(f"Colunas ausentes no DataFrame: {missing}")
 
     # --- Composição booleana -------------------------------------------------
-    def __and__(self, other: "BaseFilter") -> "AndFilter":
+    def __and__(self, other: BaseFilter) -> AndFilter:
         return AndFilter(self, other)
 
-    def __or__(self, other: "BaseFilter") -> "OrFilter":
+    def __or__(self, other: BaseFilter) -> OrFilter:
         return OrFilter(self, other)
 
-    def __invert__(self) -> "NotFilter":
+    def __invert__(self) -> NotFilter:
         return NotFilter(self)
+
 
 # -----------------------------------------------------------------------------
 # Filtros combinadores (AND/OR/NOT)

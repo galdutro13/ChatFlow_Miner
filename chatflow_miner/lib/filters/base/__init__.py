@@ -12,8 +12,8 @@ imports como:
 
 """
 
-from .base import BaseFilter, AndFilter, OrFilter, NotFilter
-from .exceptions import FilterError, RegistryError, MissingColumnsError
+from .base import AndFilter, BaseFilter, NotFilter, OrFilter
+from .exceptions import FilterError, MissingColumnsError, RegistryError
 from .utils import _ensure_bool_series
 
 __all__ = [
@@ -26,4 +26,3 @@ __all__ = [
     "NotFilter",
     "_ensure_bool_series",
 ]
-

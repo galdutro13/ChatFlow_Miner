@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import logging
 import numbers
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any
+
 import pandas as pd
 import pm4py
 
-from .base import BaseProcessModel
 from ..event_log.view import EventLogView
-
+from .base import BaseProcessModel
 
 LOGGER = logging.getLogger(__name__)
+
 
 @dataclass
 class ProcessModelView:
@@ -22,9 +23,10 @@ class ProcessModelView:
     :class:`BaseProcessModel`. O modelo somente será calculado quando
     :meth:`compute` for chamado.
     """
+
     log_view: Any
     model: BaseProcessModel
-    _cached: Optional[Any] = field(default=None, init=False, repr=False)
+    _cached: Any | None = field(default=None, init=False, repr=False)
     _cached_graphviz: dict = field(default_factory=dict, init=False, repr=False)
     _cached_quality: dict[str, float | None] | None = field(
         default=None, init=False, repr=False
@@ -47,9 +49,7 @@ class ProcessModelView:
         elif isinstance(self.log_view, pd.DataFrame):
             df = self.log_view
         else:
-            raise TypeError(
-                "log_view deve ser um EventLogView ou pandas.DataFrame"
-            )
+            raise TypeError("log_view deve ser um EventLogView ou pandas.DataFrame")
 
         result = self.model.compute(df)
         self._cached = result
@@ -80,9 +80,7 @@ class ProcessModelView:
         elif isinstance(self.log_view, pd.DataFrame):
             df = self.log_view
         else:
-            raise TypeError(
-                "log_view deve ser um EventLogView ou pandas.DataFrame"
-            )
+            raise TypeError("log_view deve ser um EventLogView ou pandas.DataFrame")
 
         event_log = None
         if not df.empty:
@@ -108,9 +106,7 @@ class ProcessModelView:
         elif isinstance(self.log_view, pd.DataFrame):
             df = self.log_view
         else:
-            raise TypeError(
-                "log_view deve ser um EventLogView ou pandas.DataFrame"
-            )
+            raise TypeError("log_view deve ser um EventLogView ou pandas.DataFrame")
 
         result = self.compute()
 
@@ -131,9 +127,7 @@ class ProcessModelView:
             elif isinstance(value, numbers.Number):
                 sanitized[key] = float(value)
             else:
-                raise TypeError(
-                    "Os valores das métricas devem ser números ou None."
-                )
+                raise TypeError("Os valores das métricas devem ser números ou None.")
 
         self._cached_quality = sanitized
         return sanitized

@@ -1,8 +1,9 @@
+import importlib
+import sys
+
 import pandas as pd
 import pm4py
 import pytest
-import sys
-import importlib
 
 
 def _sample_log_df() -> pd.DataFrame:

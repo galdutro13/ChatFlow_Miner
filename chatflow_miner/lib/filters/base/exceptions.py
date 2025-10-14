@@ -4,6 +4,7 @@ Mantém as definições de exceção separadas para evitar importações circula
 entre os módulos base e utils.
 """
 
+
 class FilterError(Exception):
     """Erro genérico ao construir ou aplicar filtros."""
 
@@ -14,4 +15,3 @@ class MissingColumnsError(FilterError):
 
 class RegistryError(FilterError):
     """Problemas ao registrar ou construir filtros via especificação declarativa."""
-

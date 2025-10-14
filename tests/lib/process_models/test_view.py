@@ -93,6 +93,7 @@ def test_quality_metrics_on_empty_log_returns_none_values():
 
 def test_to_graphviz_converts_log_once_and_passes_event_log(monkeypatch):
     from pm4py.visualization.dfg import visualizer as dfg_visualizer
+
     from chatflow_miner.lib.event_log.view import EventLogView
     from chatflow_miner.lib.process_models import dfg as dfg_module
     from chatflow_miner.lib.process_models import view as view_module
@@ -121,12 +122,14 @@ def test_to_graphviz_converts_log_once_and_passes_event_log(monkeypatch):
     viz_calls: list[dict[str, Any]] = []
 
     def fake_apply(dfg, log=None, parameters=None, variant=None, **kwargs):
-        viz_calls.append({
-            "dfg": dfg,
-            "log": log,
-            "parameters": parameters,
-            "variant": variant,
-        })
+        viz_calls.append(
+            {
+                "dfg": dfg,
+                "log": log,
+                "parameters": parameters,
+                "variant": variant,
+            }
+        )
         return {"gviz": len(viz_calls)}
 
     monkeypatch.setattr(dfg_module.pm4py, "discover_dfg", fake_discover_dfg)

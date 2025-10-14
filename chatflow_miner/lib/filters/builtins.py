@@ -1,8 +1,8 @@
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import pandas as pd
 
-from .base import BaseFilter
 from ..constants import (
     COLUMN_ACTIVITY,
     COLUMN_AGENT,
@@ -10,6 +10,9 @@ from ..constants import (
     COLUMN_END_TS,
     COLUMN_START_TS,
 )
+from .base import BaseFilter
+
+
 # -----------------------------------------------------------------------------
 # Filtros concretos (exemplos úteis para mineração de processos)
 # -----------------------------------------------------------------------------
@@ -82,7 +85,9 @@ class TimeWindowFilter(BaseFilter):
 
     required_columns = (COLUMN_START_TS,)
 
-    def __init__(self, start: Any = None, end: Any = None, mode: str = "touches") -> None:
+    def __init__(
+        self, start: Any = None, end: Any = None, mode: str = "touches"
+    ) -> None:
         self.start = pd.to_datetime(start) if start is not None else None
         self.end = pd.to_datetime(end) if end is not None else None
         self.mode = mode
@@ -113,10 +118,12 @@ class TimeWindowFilter(BaseFilter):
                 m &= st <= self.end
         return m.fillna(False)
 
+
 class CaseFilter(BaseFilter):
     """
     Mantém **todos** os eventos dos *cases* cujo ID está na lista fornecida.
     """
+
     required_columns = (COLUMN_CASE_ID,)
 
     def __init__(self, case_ids: Sequence[str]) -> None:

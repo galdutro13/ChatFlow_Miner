@@ -1,30 +1,26 @@
-from typing import Dict, Tuple, Optional, Union, Sequence, Set
+from collections.abc import Sequence
+
 import pandas as pd
 import streamlit as st
 
-from chatflow_miner.lib.process_models import (
-    ProcessModelRegistry,
-    ProcessModelView,
-    DFGModel,
-    PetriNetModel,
-)
-from chatflow_miner.lib.event_log.view import EventLogView
+from chatflow_miner.lib.process_models import ProcessModelRegistry, ProcessModelView
 
 PLACEHOLDER = "Criar novo modelo de processo..."
+
 
 def initialize_session_state() -> None:
     """
     Inicializa o estado da sessão Streamlit com valores padrão.
-    
+
     Esta função deve ser chamada no início de cada aplicação Streamlit para
     garantir que todas as variáveis de estado necessárias estejam definidas.
-    
+
     Inicializa as seguintes variáveis de estado:
     - input_dialog: Controla a exibição do diálogo de entrada de dados
     - log_eventos: Armazena o DataFrame com os dados do log de eventos
     - load_info: Armazena informações sobre o arquivo carregado
     - process_models: Registry de modelos de processo
-    
+
     :returns: None
     """
     if "input_dialog" not in st.session_state:
@@ -47,14 +43,14 @@ def initialize_session_state() -> None:
         st.session_state.latest_generated_model = None
 
 
-def get_selected_model() -> Optional[str]:
+def get_selected_model() -> str | None:
     """Retorna o nome do modelo de processo selecionado (ou None)."""
     if st.session_state.selected_model != PLACEHOLDER:
         return st.session_state.get("selected_model")
     return None
 
 
-def set_selected_model(name: Optional[str]) -> None:
+def set_selected_model(name: str | None) -> None:
     """Define o nome do modelo de processo selecionado (ou None para voltar à criação)."""
     st.session_state.selected_model = name
 
@@ -75,32 +71,34 @@ def initialize_process_models() -> None:
 def open_input_dialog() -> None:
     """
     Abre o diálogo de entrada de dados.
-    
+
     Define a variável de estado input_dialog como True, o que faz com que
     o componente de entrada de dados seja exibido na interface.
-    
+
     :returns: None
     """
     st.session_state.input_dialog = True
 
+
 def close_input_dialog() -> None:
     """
     Fecha o diálogo de entrada de dados.
-    
+
     Define a variável de estado input_dialog como False, o que faz com que
     o componente de entrada de dados seja ocultado na interface.
-    
+
     :returns: None
     """
     st.session_state.input_dialog = False
 
-def set_log_eventos(log: pd.DataFrame, load_info: Dict) -> None:
+
+def set_log_eventos(log: pd.DataFrame, load_info: dict) -> None:
     """
     Define os dados do log de eventos e informações de carregamento.
-    
+
     Armazena no estado da sessão o DataFrame com os dados do log de eventos
     e as informações sobre o arquivo que foi carregado.
-    
+
     :param log: DataFrame contendo os dados do log de eventos
     :param load_info: Dicionário com informações sobre o arquivo carregado
                      (ex: nome do arquivo, timestamp, etc.)
@@ -109,9 +107,10 @@ def set_log_eventos(log: pd.DataFrame, load_info: Dict) -> None:
     st.session_state.load_info = load_info
     st.session_state.log_eventos = log
 
+
 def get_log_eventos(
-    which: Optional[Union[str, Sequence[str]]] = None
-) -> Optional[Union[Tuple[pd.DataFrame, Dict], pd.DataFrame, Dict]]:
+    which: str | Sequence[str] | None = None,
+) -> tuple[pd.DataFrame, dict] | pd.DataFrame | dict | None:
     """
     Retorna `(log_eventos, load_info)` por padrão.
     Se `which` for uma string ou sequência contendo apenas 'load_info' ou 'log_eventos',
@@ -121,7 +120,7 @@ def get_log_eventos(
     log = st.session_state.get("log_eventos")
     info = st.session_state.get("load_info")
 
-    valid: Set[str] = {"log_eventos", "load_info"}
+    valid: set[str] = {"log_eventos", "load_info"}
 
     # Normaliza requested para um conjunto de literais
     if which is None:
@@ -155,27 +154,28 @@ def get_log_eventos(
         return log, info
     return None
 
+
 def reset_log_eventos() -> None:
     """
     Remove os dados do log de eventos do estado da sessão.
-    
+
     Limpa as variáveis de estado relacionadas aos dados carregados,
     efetivamente "descarregando" o arquivo atual.
-    
+
     :returns: None
     """
     st.session_state.log_eventos = None
     st.session_state.load_info = None
 
 
-def get_process_model(name: str) -> Optional[ProcessModelView]:
+def get_process_model(name: str) -> ProcessModelView | None:
     """
     Obtém um modelo de processo do registry.
-    
+
     :param name: Nome do modelo.
     :returns: A ProcessModelView ou None se não encontrada.
     """
     if "process_models" not in st.session_state:
         return None
-    
+
     return st.session_state.process_models.get(name)

@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from typing import Iterable, Mapping
 import logging
+from collections.abc import Iterable, Mapping
 
 import pandas as pd
 import streamlit as st
 
+from ..event_log.view import EventLogView
+from ..state.manager import set_selected_model
 from .base import BaseProcessModel
 from .dfg import DFGModel, PerformanceDFGModel
 from .petri_net import PetriNetModel
 from .view import ProcessModelView
-from ..event_log.view import EventLogView
-from ..state.manager import set_selected_model
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -20,6 +19,7 @@ LOGGER = logging.getLogger(__name__)
 # -----------------------------
 # Naming utilities (pure)
 # -----------------------------
+
 
 def normalize_name(name: str) -> str:
     """Normaliza o nome para comparação: strip + casefold."""
@@ -97,6 +97,7 @@ def render_process_graph(view: ProcessModelView) -> None:
 # Persistência em session_state
 # -----------------------------
 
+
 def save_model(name: str, view: ProcessModelView) -> None:
     """Salva o modelo no registry, atualiza seleção e fecha o diálogo.
 
@@ -127,6 +128,7 @@ def save_model(name: str, view: ProcessModelView) -> None:
 # UI: diálogo e áreas principais
 # -----------------------------
 
+
 @st.dialog("Modelo de processos gerado com sucesso", dismissible=True)
 def show_generated_model_dialog() -> None:
     """Dialogo para exibir a visualização e permitir salvar com um nome."""
@@ -147,8 +149,11 @@ def show_generated_model_dialog() -> None:
             except ValueError as exc:
                 st.error(str(exc))
             except Exception as exc:
-                st.error("Ocorreu um erro ao salvar o modelo. Verifique o nome e tente novamente.")
+                st.error(
+                    "Ocorreu um erro ao salvar o modelo. Verifique o nome e tente novamente."
+                )
                 st.exception(exc)
+
 
 @st.fragment
 def render_saved_model_ui(selected_name: str) -> None:
@@ -193,7 +198,9 @@ def render_saved_model_ui(selected_name: str) -> None:
         return
     except Exception:
         st.warning("Não foi possível calcular as métricas de qualidade do modelo.")
-        LOGGER.exception("Falha ao calcular métricas de qualidade para o modelo '%s'", selected_name)
+        LOGGER.exception(
+            "Falha ao calcular métricas de qualidade para o modelo '%s'", selected_name
+        )
         return
 
     rows = []
@@ -213,5 +220,3 @@ def render_saved_model_ui(selected_name: str) -> None:
 
     metrics_df = pd.DataFrame(rows).set_index("Métrica")
     st.table(metrics_df)
-
-

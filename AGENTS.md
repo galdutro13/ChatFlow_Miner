@@ -1,7 +1,7 @@
 # ChatFlow Miner – Agent Guide
 This repository is a **Streamlit**‑based process mining tool. It lets data scientists upload event logs from chat interactions, explore them through composable filters, compute Directly‑Follows Graph (DFG) and Petri‑net models via **pm4py**, and visualise results directly in the browser. For a high‑level overview see the .
 ## Setup & environment
-- **Python ≥3.13 is required**; create a virtual environment to avoid polluting system packages.
+- **Python ≥3.12 is required**; create a virtual environment to avoid polluting system packages.
 - The only configuration is the Python environment; there are **no custom env vars** or database secrets. Graphviz must be installed on the host to render diagrams.
 ```
 # create and activate virtualenv

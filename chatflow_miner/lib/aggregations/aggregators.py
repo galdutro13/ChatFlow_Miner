@@ -1,20 +1,21 @@
 """Concrete case aggregators (variant, case_date)."""
+
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
 import logging
+from typing import Any
 
 import pandas as pd
 
-from chatflow_miner.lib.constants import (
-    COLUMN_CASE_ID,
-    COLUMN_EVENT_ID,
-    COLUMN_ACTIVITY,
-    COLUMN_START_TS,
-    COLUMN_AGENT,
-)
 from chatflow_miner.lib.aggregations.base import BaseCaseAggregator
 from chatflow_miner.lib.aggregations.models import VariantInfo
+from chatflow_miner.lib.constants import (
+    COLUMN_ACTIVITY,
+    COLUMN_AGENT,
+    COLUMN_CASE_ID,
+    COLUMN_EVENT_ID,
+    COLUMN_START_TS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +31,20 @@ class CaseVariantAggregator(BaseCaseAggregator):
       - Frequência por variante é calculada **globalmente** em `prepare`.
     """
 
-    required_columns = (COLUMN_CASE_ID, COLUMN_ACTIVITY, COLUMN_START_TS, COLUMN_EVENT_ID)
+    required_columns = (
+        COLUMN_CASE_ID,
+        COLUMN_ACTIVITY,
+        COLUMN_START_TS,
+        COLUMN_EVENT_ID,
+    )
 
     def __init__(self, *, ignore_syst: bool = False, joiner: str = ">") -> None:
         self.ignore_syst = bool(ignore_syst)
         self.joiner = joiner
 
-    def prepare(self, df: pd.DataFrame) -> Tuple[Dict[Any, str], Dict[str, VariantInfo]]:
+    def prepare(
+        self, df: pd.DataFrame
+    ) -> tuple[dict[Any, str], dict[str, VariantInfo]]:
         self._check_columns(df)
         df2 = df.copy()
 
@@ -53,15 +61,17 @@ class CaseVariantAggregator(BaseCaseAggregator):
             mask = df2[COLUMN_AGENT].astype(str).str.lower() != "syst"
             df2 = df2.loc[mask]
 
-        df2 = df2.sort_values([COLUMN_CASE_ID, COLUMN_START_TS, "__EV_ORDER__"], kind="mergesort")
+        df2 = df2.sort_values(
+            [COLUMN_CASE_ID, COLUMN_START_TS, "__EV_ORDER__"], kind="mergesort"
+        )
         seq = df2.groupby(COLUMN_CASE_ID)[COLUMN_ACTIVITY].agg(list)
-        case_to_variant: Dict[Any, str] = seq.apply(
+        case_to_variant: dict[Any, str] = seq.apply(
             lambda xs: self.joiner.join(map(str, xs)) if len(xs) else ""
         ).to_dict()
 
         freq = pd.Series(case_to_variant).value_counts()
 
-        var_to_info: Dict[str, VariantInfo] = {}
+        var_to_info: dict[str, VariantInfo] = {}
         # Assign human-friendly sequential variant IDs in descending frequency order
         # e.g. 'variant 1' for the most frequent variant, 'variant 2' for the next, etc.
         for idx, (variant_str, frequency) in enumerate(freq.items(), start=1):
@@ -77,7 +87,11 @@ class CaseVariantAggregator(BaseCaseAggregator):
 
         return case_to_variant, var_to_info
 
-    def compute_case(self, case_df: pd.DataFrame, state: Tuple[Dict[Any, str], Dict[str, VariantInfo]]) -> VariantInfo:
+    def compute_case(
+        self,
+        case_df: pd.DataFrame,
+        state: tuple[dict[Any, str], dict[str, VariantInfo]],
+    ) -> VariantInfo:
         case_to_variant, var_to_info = state
         case_id = case_df.iloc[0][COLUMN_CASE_ID]
         vstr = case_to_variant.get(case_id, "")

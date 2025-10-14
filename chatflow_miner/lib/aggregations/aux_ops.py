@@ -1,12 +1,13 @@
 """Auxiliary operations (pre-processing) for case aggregations."""
+
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 import pandas as pd
 
-from chatflow_miner.lib.constants import COLUMN_CASE_ID, COLUMN_START_TS, COLUMN_END_TS
 from chatflow_miner.lib.aggregations.exceptions import MissingColumnsError
+from chatflow_miner.lib.constants import COLUMN_CASE_ID, COLUMN_END_TS, COLUMN_START_TS
 
 
 class BaseAuxOp:
@@ -60,4 +61,3 @@ class DeriveCaseStartDateOp(BaseAuxOp):
         case_start = st.groupby(df2[COLUMN_CASE_ID]).transform("min")
         df2[self.target_col] = case_start.dt.date
         return df2
-

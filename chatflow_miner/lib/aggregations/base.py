@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
+
 import pandas as pd
 
 from chatflow_miner.lib.aggregations.exceptions import MissingColumnsError
@@ -24,6 +26,7 @@ class BaseCaseAggregator:
     def prepare(self, df: pd.DataFrame) -> Any:  # pragma: no cover - padrão
         return None
 
-    def compute_case(self, case_df: pd.DataFrame, state: Any) -> Any:  # pragma: no cover
+    def compute_case(
+        self, case_df: pd.DataFrame, state: Any
+    ) -> Any:  # pragma: no cover
         raise NotImplementedError
-
