@@ -206,59 +206,6 @@ def _quality_metrics_for_dfg(
         )
         precision_ok = False
 
-    # ---------------------------
-    # 8) Fallback alinhado (1x) se precision falhou/None
-    #    Reuso dos alinhamentos para também derivar fitness, se necessário.
-    # ---------------------------
-    if not precision_ok:
-        try:
-            alignments = pm4py.conformance.conformance_diagnostics_alignments(
-                event_log if event_log is not None else pm4py.convert_to_event_log(df),
-                net,
-                initial_marking,
-                final_marking,
-                multi_processing=True,
-            )
-
-            # Precision via ALIGN_ETCONFORMANCE, injetando alinhamentos quando aceito
-            try:
-                metrics["precision"] = _safe_number(
-                    prec_algorithm.apply(
-                        event_log if event_log is not None else df,
-                        net,
-                        initial_marking,
-                        final_marking,
-                        parameters={**eval_params, "aligned_traces": alignments},
-                        variant=getattr(prec_algorithm, "Variants").ALIGN_ETCONFORMANCE,
-                    )
-                )
-            except Exception:
-                # fallback: deixa a variante calcular seus próprios alinhamentos
-                metrics["precision"] = _safe_number(
-                    prec_algorithm.apply(
-                        event_log if event_log is not None else df,
-                        net,
-                        initial_marking,
-                        final_marking,
-                        parameters=eval_params,
-                        variant=getattr(prec_algorithm, "Variants").ALIGN_ETCONFORMANCE,
-                    )
-                )
-
-            # Se fitness ainda não foi preenchido, derivá-lo dos mesmos alinhamentos
-            if metrics["fitness"] is None and rf_align_eval is not None:
-                try:
-                    fitness_from_al = rf_align_eval.evaluate(alignments, parameters=eval_params)
-                    fitness_val = fitness_from_al.get("log_fitness") or fitness_from_al.get("average_trace_fitness")
-                    metrics["fitness"] = _safe_number(fitness_val)
-                except Exception:
-                    LOGGER.exception("Falha ao avaliar fitness a partir de alinhamentos pré-computados (DFG).")
-
-        except Exception:
-            LOGGER.exception(
-                "Fallback alinhado falhou (cálculo de alinhamentos/precision) para o modelo DFG."
-            )
-
     return metrics
 
 

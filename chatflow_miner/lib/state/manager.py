@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Optional, Union, Sequence, Set, Any
+from typing import Dict, Tuple, Optional, Union, Sequence, Set
 import pandas as pd
 import streamlit as st
 
@@ -168,77 +168,6 @@ def reset_log_eventos() -> None:
     st.session_state.load_info = None
 
 
-def add_process_model(
-    name: str,
-    model_type: str = "dfg",
-    log_view: Optional[Union[EventLogView, pd.DataFrame]] = None,
-    **model_kwargs: Any
-) -> None:
-    """
-    Adiciona um novo modelo de processo ao registry.
-    
-    :param name: Nome único para o modelo de processo.
-    :param model_type: Tipo do modelo ("dfg" para Directly-Follows Graph).
-    :param log_view: Visão do log de eventos ou DataFrame. Se None, usa o log atual.
-    :param model_kwargs: Parâmetros adicionais para o modelo.
-    :raises ValueError: Se o nome já existe ou se o tipo de modelo não é suportado.
-    :raises RuntimeError: Se não há log de eventos disponível.
-    """
-    if "process_models" not in st.session_state:
-        st.session_state.process_models = ProcessModelRegistry()
-    
-    # Verifica se o nome já existe
-    if name in st.session_state.process_models:
-        raise ValueError(f"Modelo de processo '{name}' já existe.")
-    
-    # Se não foi fornecido log_view, usa o log atual
-    if log_view is None:
-        log_data = get_log_eventos(which="log_eventos")
-        if log_data is None:
-            raise RuntimeError("Nenhum log de eventos disponível. Carregue um arquivo primeiro.")
-        log_view = log_data
-    
-    model_type_key = model_type.strip().casefold()
-    factories = {
-        "dfg": DFGModel,
-        "petri_net": PetriNetModel,
-        "petri-net": PetriNetModel,
-        "petri": PetriNetModel,
-    }
-    try:
-        model_cls = factories[model_type_key]
-    except KeyError as exc:
-        raise ValueError(
-            f"Tipo de modelo '{model_type}' não é suportado. Tipos disponíveis: "
-            "'dfg', 'petri_net'"
-        ) from exc
-
-    model = model_cls(**model_kwargs)
-    
-    # Cria a ProcessModelView
-    process_model_view = ProcessModelView(log_view=log_view, model=model)
-    
-    # Adiciona ao registry
-    st.session_state.process_models.add(name, process_model_view)
-
-
-def remove_process_model(name: str) -> Optional[ProcessModelView]:
-    """
-    Remove um modelo de processo do registry.
-    
-    :param name: Nome do modelo a ser removido.
-    :returns: A ProcessModelView removida ou None se não encontrada.
-    :raises KeyError: Se o modelo não existe.
-    """
-    if "process_models" not in st.session_state:
-        raise KeyError("Registry de process_models não inicializado.")
-    
-    if name not in st.session_state.process_models:
-        raise KeyError(f"Modelo de processo '{name}' não encontrado.")
-    
-    return st.session_state.process_models.remove(name)
-
-
 def get_process_model(name: str) -> Optional[ProcessModelView]:
     """
     Obtém um modelo de processo do registry.
@@ -250,15 +179,3 @@ def get_process_model(name: str) -> Optional[ProcessModelView]:
         return None
     
     return st.session_state.process_models.get(name)
-
-
-def list_process_models() -> list[str]:
-    """
-    Lista todos os nomes de modelos de processo no registry.
-    
-    :returns: Lista de nomes dos modelos.
-    """
-    if "process_models" not in st.session_state:
-        return []
-    
-    return list(st.session_state.process_models.names)

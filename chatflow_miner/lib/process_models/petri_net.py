@@ -233,59 +233,5 @@ class PetriNetModel(BaseProcessModel):
             LOGGER.exception("Falha ao calcular precision (ETConformance por token-based).")
             precision_ok = False
 
-        # ---------------------------
-        # Fallback ALINHADO (1x) se preciso:
-        #   * necessário quando precision token-based falha ou retorna None/NaN.
-        #   * REUSA o mesmo alinhamento para derivar fitness (sem novo replay).
-        # ---------------------------
-        if not precision_ok:
-            try:
-                # Uma passada de alinhamento (pode ser custosa). Habilita multiprocessing (quando seguro).
-                # Usa a API de alto nível do PM4Py para obter diagnósticos de alinhamento.
-                alignments_cache = pm4py.conformance.conformance_diagnostics_alignments(
-                    event_log if event_log is not None else pm4py.convert_to_event_log(df),
-                    net,
-                    initial_marking,
-                    final_marking,
-                    multi_processing=True,
-                )
-
-                # Precision via ALIGN_ETCONFORMANCE a partir dos alinhamentos (parâmetro padrão da variante usa alinhamentos internos);
-                # alguns releases aceitam passar explicitamente o resultado de alinhamentos via 'parameters'.
-                try:
-                    metrics["precision"] = _safe_number(
-                        prec_algorithm.apply(
-                            event_log if event_log is not None else df,
-                            net,
-                            initial_marking,
-                            final_marking,
-                            parameters={**eval_params, "aligned_traces": alignments_cache},
-                            variant=getattr(prec_algorithm, "Variants").ALIGN_ETCONFORMANCE,
-                        )
-                    )
-                except Exception:
-                    # Tenta sem injetar 'aligned_traces' (variante fará o uso interno do algoritmo de alinhamento)
-                    metrics["precision"] = _safe_number(
-                        prec_algorithm.apply(
-                            event_log if event_log is not None else df,
-                            net,
-                            initial_marking,
-                            final_marking,
-                            parameters=eval_params,
-                            variant=getattr(prec_algorithm, "Variants").ALIGN_ETCONFORMANCE,
-                        )
-                    )
-
-                # Se fitness ainda está None, deriva dos MESMOS alinhamentos (zero recomputação)
-                if metrics["fitness"] is None and rf_align_eval is not None:
-                    try:
-                        fitness_from_al = rf_align_eval.evaluate(alignments_cache, parameters=eval_params)
-                        fitness_val = fitness_from_al.get("log_fitness") or fitness_from_al.get("average_trace_fitness")
-                        metrics["fitness"] = _safe_number(fitness_val)
-                    except Exception:
-                        LOGGER.exception("Falha ao avaliar fitness a partir dos alinhamentos pré-computados.")
-            except Exception:
-                LOGGER.exception("Fallback alinhado falhou (cálculo de alinhamentos/precision).")
-
         return metrics
 

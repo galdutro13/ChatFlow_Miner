@@ -44,13 +44,11 @@ def name_is_unique(name: str, existing: Iterable[str]) -> bool:
 
 _MODEL_FACTORY: Mapping[str, type[BaseProcessModel]] = {
     "dfg": DFGModel,
-    "performance_dfg": PerformanceDFGModel,
     "performance-dfg": PerformanceDFGModel,
-    "petri_net": PetriNetModel,
+    "performance_dfg": PerformanceDFGModel,
     "petri-net": PetriNetModel,
-    "petri": PetriNetModel,
 }
-_CANONICAL_KEYS = ("dfg", "performance_dfg", "petri_net")
+_CANONICAL_KEYS = ("dfg", "performance-dfg", "petri-net")
 
 
 def _resolve_model(model: BaseProcessModel | str | None) -> BaseProcessModel:
