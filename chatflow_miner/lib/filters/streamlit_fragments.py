@@ -137,19 +137,28 @@ def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView
     """
     df = get_log_eventos(which="log_eventos")
     if df is None:
-        st.multiselect("Filtro de VARIANTE", [], [], disabled=disabled); return None
+        st.multiselect("Filtro de VARIANTE", [], [], disabled=disabled)
+        return None
     result = CaseAggView(base_df=df).with_aggregator(CaseVariantAggregator()).compute()
-    gid = lambda k: getattr(result[k], "variant_id", k)
+
+    def gid(key: str) -> str:
+        return getattr(result[key], "variant_id", key)
     seen = set()
     variants = [v for v in result if (vid := gid(v)) not in seen and not seen.add(vid)]
     variants.sort(key=lambda v: result[v].frequency, reverse=True)
-    fmt = lambda v: f"freq={result[v].frequency} | {result[v].variant_id} | " \
-                    f"{result[v].variant}"
+    def fmt(variant_key: str) -> str:
+        return (
+            f"freq={result[variant_key].frequency} | "
+            f"{result[variant_key].variant_id} | "
+            f"{result[variant_key].variant}"
+        )
     selected = st.multiselect("Filtro de VARIANTE", variants, [], format_func=fmt,
                               disabled=disabled)
     if selected:
-        cid = {gid(v) for v in selected}; ks = [k for k in result if gid(k) in cid]
-        if ks: return event_view.filter(CaseFilter(case_ids=ks))
+        cid = {gid(v) for v in selected}
+        ks = [k for k in result if gid(k) in cid]
+        if ks:
+            return event_view.filter(CaseFilter(case_ids=ks))
     return event_view
 
 

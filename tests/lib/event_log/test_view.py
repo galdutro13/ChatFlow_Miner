@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 
 from chatflow_miner.lib.event_log.view import EventLogView
-from chatflow_miner.lib.filters.builtins import AgentFilter, TimeWindowFilter
+from chatflow_miner.lib.filters.builtins import AgentFilter
 
 
 def test_event_log_view_compute_without_filters_returns_copy_and_equal():

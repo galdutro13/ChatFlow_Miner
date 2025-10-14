@@ -107,12 +107,6 @@ class PetriNetModel(BaseProcessModel):
         Dict[str, float | None]
             Dicionário com métricas: fitness, precision, generalization, simplicity.
         """
-        import math
-        import time
-        import logging
-
-        LOGGER = logging.getLogger(__name__)
-
         # Imports locais para robustez a mudanças de API entre versões
         try:
             from pm4py.algo.evaluation.replay_fitness import algorithm as rf_algorithm

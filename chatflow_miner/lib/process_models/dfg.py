@@ -51,11 +51,6 @@ def _quality_metrics_for_dfg(
         Dicionário com métricas: ``fitness``, ``precision``, ``generalization``,
         ``simplicity``.
     """
-    import math
-    import logging
-
-    LOGGER = logging.getLogger(__name__)
-
     # ---------------------------
     # 1) Converter DFG -> Petri net
     # ---------------------------

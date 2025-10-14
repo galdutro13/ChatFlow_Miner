@@ -3,7 +3,13 @@ from typing import Any, Sequence
 import pandas as pd
 
 from .base import BaseFilter
-from ..constants import *
+from ..constants import (
+    COLUMN_ACTIVITY,
+    COLUMN_AGENT,
+    COLUMN_CASE_ID,
+    COLUMN_END_TS,
+    COLUMN_START_TS,
+)
 # -----------------------------------------------------------------------------
 # Filtros concretos (exemplos úteis para mineração de processos)
 # -----------------------------------------------------------------------------

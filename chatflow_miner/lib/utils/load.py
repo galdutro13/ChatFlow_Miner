@@ -38,6 +38,6 @@ def load_dataset(file: str, load_options: Dict[Any, Any]) -> pd.DataFrame:
     except ValueError as exp:
         st.error(exp)
         st.stop()
-    except:
+    except Exception:
         st.error("Erro ao carregar arquivo de log")
         st.stop()

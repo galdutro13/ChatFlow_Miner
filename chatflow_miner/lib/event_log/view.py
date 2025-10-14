@@ -6,7 +6,6 @@ from collections.abc import Iterable
 import pandas as pd
 
 from ..filters.base import BaseFilter, _ensure_bool_series
-from ..constants import COLUMN_CASE_ID
 # -----------------------------------------------------------------------------
 # EventLogView: visão lazy sobre o DataFrame
 # -----------------------------------------------------------------------------

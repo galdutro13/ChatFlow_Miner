@@ -1,8 +1,5 @@
 import types
 import pandas as pd
-import pytest
-
-
 class TempModulePatcher:
     """
     Context manager to temporarily inject/patch entries in sys.modules.
