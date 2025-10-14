@@ -73,6 +73,9 @@ The baseline thresholds live in `quality_gate_baselines.yml`:
 - `coverage.chatflow_miner.lib`: minimum overall coverage for the `chatflow_miner.lib` package (currently **62.45%**).
 - `ruff.violation_count`: maximum number of Ruff lint findings allowed across `chatflow_miner` and `tests` (currently **28**).
 
+With every proposed change you make, recalculate the quality-gate metrics for the codebase.
+If any of these metrics change, update the values in the YML file. Avoid worsening these metrics at all costs.
+
 The workflow uploads both `coverage.xml` and `ruff_report.json` as artifacts so reviewers can inspect the raw metrics.
 
 #### Refreshing baselines after improvements
