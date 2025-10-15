@@ -32,6 +32,9 @@ def filter_section(*, disabled: bool = False):
 
     selected_model_type = process_model_selector(disabled)
 
+    with st.expander("Filtros Avançados"):
+        st.markdown("<u>Em construção</u>", unsafe_allow_html=True)
+
     st.dataframe(event_log_view.compute())
 
     # Área inferior com botão à direita
