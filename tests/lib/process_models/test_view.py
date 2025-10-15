@@ -151,5 +151,73 @@ def test_to_graphviz_converts_log_once_and_passes_event_log(monkeypatch):
 
     third = model_view.to_graphviz(rankdir="TB")
     assert third == {"gviz": 2}
-    assert len(convert_calls) == 2
+    assert len(convert_calls) == 1
     assert viz_calls[-1]["log"] is event_log_obj
+
+
+def test_process_model_view_reuses_dataframe_and_event_log(monkeypatch):
+    from chatflow_miner.lib.event_log.view import EventLogView
+    from chatflow_miner.lib.process_models.base import BaseProcessModel
+    from chatflow_miner.lib.process_models import view as view_module
+    from chatflow_miner.lib.process_models.view import ProcessModelView
+
+    class CountingEventLogView(EventLogView):
+        def __init__(self, base_df, filters=()):
+            object.__setattr__(self, "_compute_calls", 0)
+            super().__init__(base_df, filters)
+
+        def compute(self):
+            object.__setattr__(self, "_compute_calls", self._compute_calls + 1)
+            return super().compute()
+
+        @property
+        def compute_calls(self) -> int:
+            return self._compute_calls
+
+    class RecordingModel(BaseProcessModel):
+        def __init__(self) -> None:
+            self.compute_calls = 0
+            self.event_logs: list[Any] = []
+
+        def compute(self, df: pd.DataFrame) -> dict[str, int]:
+            self.compute_calls += 1
+            return {"df_id": id(df)}
+
+        def to_graphviz(self, model: Any, log: Any | None = None, **_: Any) -> dict[str, Any]:
+            self.event_logs.append(log)
+            return {"viz": len(self.event_logs)}
+
+        def quality_metrics(
+            self,
+            df: pd.DataFrame,
+            model: dict[str, int],
+            *,
+            event_log: Any | None = None,
+        ) -> dict[str, float]:
+            self.event_logs.append(event_log)
+            return {"metric": float(model["df_id"])}
+
+    formatted = _build_formatted_log()
+    counting_view = CountingEventLogView(formatted)
+    model = RecordingModel()
+    model_view = ProcessModelView(log_view=counting_view, model=model)
+
+    event_log_obj = object()
+    convert_calls = {"count": 0}
+
+    def fake_convert(df: pd.DataFrame) -> Any:
+        convert_calls["count"] += 1
+        pd.testing.assert_frame_equal(df, formatted)
+        return event_log_obj
+
+    monkeypatch.setattr(view_module.pm4py, "convert_to_event_log", fake_convert)
+
+    model_view.compute()
+    model_view.to_graphviz()
+    model_view.quality_metrics()
+
+    assert counting_view.compute_calls == 1
+    assert model.compute_calls == 1
+    assert convert_calls["count"] == 1
+    assert len(model.event_logs) == 2
+    assert {id(log) for log in model.event_logs} == {id(event_log_obj)}

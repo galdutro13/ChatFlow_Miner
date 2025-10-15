@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 import numbers
 from dataclasses import dataclass, field
@@ -31,6 +32,46 @@ class ProcessModelView:
     _cached_quality: dict[str, float | None] | None = field(
         default=None, init=False, repr=False
     )
+    _cached_df: pd.DataFrame | None = field(default=None, init=False, repr=False)
+    _cached_event_log: Any | None = field(default=None, init=False, repr=False)
+    _event_log_failed: bool = field(default=False, init=False, repr=False)
+
+    def _materialize_dataframe(self) -> pd.DataFrame:
+        """Return the cached DataFrame, materialising it on first use."""
+
+        if self._cached_df is not None:
+            return self._cached_df
+
+        if isinstance(self.log_view, EventLogView):
+            df = self.log_view.compute()
+        elif isinstance(self.log_view, pd.DataFrame):
+            df = self.log_view
+        else:  # pragma: no cover - defensive guard
+            raise TypeError("log_view deve ser um EventLogView ou pandas.DataFrame")
+
+        self._cached_df = df
+        return df
+
+    def _materialize_event_log(self, df: pd.DataFrame, *, context: str) -> Any | None:
+        """Convert the cached DataFrame to an EventLog once per view."""
+
+        if self._cached_event_log is not None:
+            return self._cached_event_log
+
+        if self._event_log_failed or df is None or df.empty:
+            return None
+
+        try:
+            event_log = pm4py.convert_to_event_log(df)
+        except Exception:  # pragma: no cover - logged for observability
+            LOGGER.exception(
+                "Falha ao converter DataFrame para EventLog durante %s.", context
+            )
+            self._event_log_failed = True
+            return None
+
+        self._cached_event_log = event_log
+        return event_log
 
     def compute(self) -> Any:
         """
@@ -43,14 +84,7 @@ class ProcessModelView:
         if self._cached is not None:
             return self._cached
 
-        # Se log_view for um EventLogView, aplica filtros primeiro
-        if isinstance(self.log_view, EventLogView):
-            df = self.log_view.compute()
-        elif isinstance(self.log_view, pd.DataFrame):
-            df = self.log_view
-        else:
-            raise TypeError("log_view deve ser um EventLogView ou pandas.DataFrame")
-
+        df = self._materialize_dataframe()
         result = self.model.compute(df)
         self._cached = result
         # Limpa cache de visualizações quando o resultado muda
@@ -74,22 +108,13 @@ class ProcessModelView:
         if cache_key in self._cached_graphviz:
             return self._cached_graphviz[cache_key]
 
-        df: pd.DataFrame
-        if isinstance(self.log_view, EventLogView):
-            df = self.log_view.compute()
-        elif isinstance(self.log_view, pd.DataFrame):
-            df = self.log_view
-        else:
-            raise TypeError("log_view deve ser um EventLogView ou pandas.DataFrame")
-
-        event_log = None
-        if not df.empty:
-            try:
-                event_log = pm4py.convert_to_event_log(df)
-            except Exception:  # pragma: no cover - logged for observability
-                LOGGER.exception(
-                    "Falha ao converter DataFrame para EventLog durante a visualização."
-                )
+        df = self._materialize_dataframe()
+        user_supplied_log = kwargs.pop("log", None)
+        event_log = (
+            user_supplied_log
+            if user_supplied_log is not None
+            else self._materialize_event_log(df, context="a visualização do modelo")
+        )
 
         viz = self.model.to_graphviz(result, log=event_log, **kwargs)
         self._cached_graphviz[cache_key] = viz
@@ -101,13 +126,7 @@ class ProcessModelView:
         if self._cached_quality is not None:
             return self._cached_quality
 
-        if isinstance(self.log_view, EventLogView):
-            df = self.log_view.compute()
-        elif isinstance(self.log_view, pd.DataFrame):
-            df = self.log_view
-        else:
-            raise TypeError("log_view deve ser um EventLogView ou pandas.DataFrame")
-
+        df = self._materialize_dataframe()
         result = self.compute()
 
         quality_fn = getattr(self.model, "quality_metrics", None)
@@ -116,7 +135,25 @@ class ProcessModelView:
                 f"{type(self.model).__name__} não implementa métricas de qualidade."
             )
 
-        metrics_mapping = quality_fn(df, result)
+        quality_kwargs: dict[str, Any] = {}
+        event_log = self._materialize_event_log(
+            df, context="o cálculo de métricas de qualidade"
+        )
+        if event_log is not None:
+            try:
+                signature = inspect.signature(quality_fn)
+            except (TypeError, ValueError):  # pragma: no cover - dynamic callables
+                signature = None
+            if signature is not None:
+                for parameter in signature.parameters.values():
+                    if parameter.name == "event_log" and parameter.kind in (
+                        parameter.POSITIONAL_OR_KEYWORD,
+                        parameter.KEYWORD_ONLY,
+                    ):
+                        quality_kwargs["event_log"] = event_log
+                        break
+
+        metrics_mapping = quality_fn(df, result, **quality_kwargs)
         metrics_dict = dict(metrics_mapping)
 
         sanitized: dict[str, float | None] = {}

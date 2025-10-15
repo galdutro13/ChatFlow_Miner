@@ -16,6 +16,8 @@ LOGGER = logging.getLogger(__name__)
 def _quality_metrics_for_dfg(
     df: "pd.DataFrame",
     model: "Tuple[dict, dict, dict]",
+    *,
+    event_log: "Any | None" = None,
 ) -> "Dict[str, float | None]":
     """
     Calcula métricas de qualidade para um DFG convertendo-o para rede de Petri
@@ -154,21 +156,22 @@ def _quality_metrics_for_dfg(
     # ---------------------------
     # 5) Preparar EventLog 1x
     # ---------------------------
-    event_log = None
-    try:
-        event_log = pm4py.convert_to_event_log(df)
-    except Exception:
-        LOGGER.exception(
-            "Falha ao converter DataFrame para EventLog; seguiremos usando DF onde possível."
-        )
-        event_log = None
+    event_log_obj = event_log
+    if event_log_obj is None:
+        try:
+            event_log_obj = pm4py.convert_to_event_log(df)
+        except Exception:
+            LOGGER.exception(
+                "Falha ao converter DataFrame para EventLog; seguiremos usando DF onde possível."
+            )
+            event_log_obj = None
 
     # ---------------------------
     # 6) Generalization (moderado)
     # ---------------------------
     try:
         gen_val = gen_algorithm.apply(
-            event_log if event_log is not None else df,
+            event_log_obj if event_log_obj is not None else df,
             net,
             initial_marking,
             final_marking,
@@ -183,7 +186,7 @@ def _quality_metrics_for_dfg(
     # ---------------------------
     try:
         fitness_res = rf_algorithm.apply(
-            event_log if event_log is not None else df,
+            event_log_obj if event_log_obj is not None else df,
             net,
             initial_marking,
             final_marking,
@@ -202,7 +205,7 @@ def _quality_metrics_for_dfg(
 
     try:
         prec_val = prec_algorithm.apply(
-            event_log if event_log is not None else df,
+            event_log_obj if event_log_obj is not None else df,
             net,
             initial_marking,
             final_marking,
@@ -299,9 +302,11 @@ class DFGModel(BaseProcessModel):
         self,
         df: "pd.DataFrame",
         model: "Tuple[dict, dict, dict]",
+        *,
+        event_log: "Any | None" = None,
     ) -> "Dict[str, float | None]":
         """Delegates to the shared DFG quality-metrics implementation."""
-        return _quality_metrics_for_dfg(df, model)
+        return _quality_metrics_for_dfg(df, model, event_log=event_log)
 
 
 class PerformanceDFGModel(BaseProcessModel):
