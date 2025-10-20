@@ -32,8 +32,7 @@ def filter_section(*, disabled: bool = False):
 
     selected_model_type = process_model_selector(disabled)
 
-    with st.expander("Filtros Avançados"):
-        st.markdown("<u>Em construção</u>", unsafe_allow_html=True)
+    advanced_filter(disabled=disabled)
 
     st.dataframe(event_log_view.compute())
 
@@ -283,3 +282,17 @@ def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | 
         end_ts = end_ts if end_ts.tzinfo else end_ts.tz_localize(tz)
 
     return event_view.filter(TimeWindowFilter(start=start_ts, end=end_ts))
+
+
+def advanced_filter(disabled: bool):
+    with st.expander("Filtros Avançados"):
+        st.markdown("<u>Em construção</u>", unsafe_allow_html=True)
+        st.markdown("**Filtro por relação**")
+        st.radio(label="Tipo de relação", options=['Eventually Follows', 'Immediately Follows'])
+        col1, col2 = st.columns(2)
+
+        with col1:
+            predecessor = st.multiselect(label="Predecessor", options=['A', 'B', 'C', 'D', 'E'])
+
+        with col2:
+            sucessor = st.multiselect(label="Sucessor", options=['A', 'B', 'C', 'D', 'E'])
