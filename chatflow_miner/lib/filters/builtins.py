@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
+import pm4py
 
 from ..constants import (
     COLUMN_ACTIVITY,
@@ -11,6 +14,7 @@ from ..constants import (
     COLUMN_START_TS,
 )
 from .base import BaseFilter
+from .base.exceptions import FilterError
 
 
 # -----------------------------------------------------------------------------
@@ -132,3 +136,63 @@ class CaseFilter(BaseFilter):
     def mask(self, df: pd.DataFrame) -> pd.Series:
         self._check_columns(df)
         return df[COLUMN_CASE_ID].isin(self.case_ids)
+
+
+class _BaseRelationFilter(BaseFilter):
+    """Filtro base para relações entre atividades (seguidores)."""
+
+    required_columns = (COLUMN_CASE_ID, COLUMN_ACTIVITY, COLUMN_START_TS)
+
+    def __init__(self, predecessor: str, successor: str) -> None:
+        self.predecessor = self._normalise_activity(predecessor)
+        self.successor = self._normalise_activity(successor)
+
+    @staticmethod
+    def _normalise_activity(value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("activity names must be strings")
+        normalised = value.strip()
+        if not normalised:
+            raise ValueError("activity names must be non-empty")
+        return normalised
+
+    def _filter_log(self, event_log: pm4py.objects.log.obj.EventLog) -> pm4py.objects.log.obj.EventLog:
+        raise NotImplementedError
+
+    def mask(self, df: pd.DataFrame) -> pd.Series:
+        self._check_columns(df)
+        sorted_df = df.sort_values(COLUMN_START_TS, kind="mergesort")
+        try:
+            event_log = pm4py.convert_to_event_log(sorted_df)
+            filtered_log = self._filter_log(event_log)
+        except Exception as exc:  # pragma: no cover - defensive path
+            raise FilterError(
+                f"Erro ao aplicar {self.__class__.__name__}: {exc}"
+            ) from exc
+
+        case_ids = {
+            trace.attributes.get("concept:name")
+            for trace in filtered_log
+            if trace.attributes.get("concept:name") is not None
+        }
+
+        mask = df[COLUMN_CASE_ID].isin(case_ids)
+        return mask.reindex(df.index, fill_value=False)
+
+
+class EventuallyFollowsFilter(_BaseRelationFilter):
+    """Mantém casos em que a atividade sucessora ocorre após a predecessora."""
+
+    def _filter_log(self, event_log: pm4py.objects.log.obj.EventLog) -> pm4py.objects.log.obj.EventLog:
+        return pm4py.filtering.filter_eventually_follows_relation(
+            log=event_log, relations=[(self.predecessor, self.successor)]
+        )
+
+
+class DirectlyFollowsFilter(_BaseRelationFilter):
+    """Mantém casos em que a sucessora ocorre imediatamente após a predecessora."""
+
+    def _filter_log(self, event_log: pm4py.objects.log.obj.EventLog) -> pm4py.objects.log.obj.EventLog:
+        return pm4py.filtering.filter_directly_follows_relation(
+            log=event_log, relations=[(self.predecessor, self.successor)]
+        )

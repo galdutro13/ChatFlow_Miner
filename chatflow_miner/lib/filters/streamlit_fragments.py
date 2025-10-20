@@ -8,11 +8,14 @@ from chatflow_miner.lib.aggregations import (
     CaseDateAggregator,
     CaseVariantAggregator,
 )
-from chatflow_miner.lib.constants import COLUMN_START_TS
+from chatflow_miner.lib.constants import COLUMN_ACTIVITY, COLUMN_START_TS
 from chatflow_miner.lib.event_log.view import EventLogView
+from chatflow_miner.lib.filters.base.exceptions import FilterError
 from chatflow_miner.lib.filters.builtins import (
     AgentFilter,
     CaseFilter,
+    DirectlyFollowsFilter,
+    EventuallyFollowsFilter,
     TimeWindowFilter,
 )
 from chatflow_miner.lib.process_models.ui import (
@@ -32,7 +35,7 @@ def filter_section(*, disabled: bool = False):
 
     selected_model_type = process_model_selector(disabled)
 
-    advanced_filter(disabled=disabled)
+    event_log_view = advanced_filter(event_log_view, disabled) or event_log_view
 
     st.dataframe(event_log_view.compute())
 
@@ -284,15 +287,99 @@ def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | 
     return event_view.filter(TimeWindowFilter(start=start_ts, end=end_ts))
 
 
-def advanced_filter(disabled: bool):
+def advanced_filter(event_view: EventLogView, disabled: bool) -> EventLogView | None:
+    """Renderiza filtros avançados baseados em relações entre atividades."""
+
+    relation_options = ("Eventually Follows", "Directly Follows")
+
     with st.expander("Filtros Avançados"):
-        st.markdown("<u>Em construção</u>", unsafe_allow_html=True)
-        st.markdown("**Filtro por relação**")
-        st.radio(label="Tipo de relação", options=['Eventually Follows', 'Immediately Follows'])
+        st.markdown(
+            "Selecione pares de atividades para manter apenas os casos em que a"
+            " sucessora ocorre após a predecessora. Use 'Directly Follows' para"
+            " exigir que a transição seja imediata, sem eventos intermediários."
+        )
+
+        df = get_log_eventos(which="log_eventos")
+        if df is None or COLUMN_ACTIVITY not in df.columns or df.empty:
+            st.radio(
+                label="Tipo de relação",
+                options=relation_options,
+                index=0,
+                disabled=True,
+            )
+            col1, col2 = st.columns(2)
+            with col1:
+                st.selectbox(
+                    label="Predecessora",
+                    options=[""],
+                    index=0,
+                    disabled=True,
+                )
+            with col2:
+                st.selectbox(
+                    label="Sucessora",
+                    options=[""],
+                    index=0,
+                    disabled=True,
+                )
+            return None
+
+        activities = sorted(
+            {
+                str(value).strip()
+                for value in df[COLUMN_ACTIVITY].dropna().unique().tolist()
+                if str(value).strip()
+            }
+        )
+
+        if not activities:
+            st.info("O log carregado não possui atividades disponíveis para filtrar.")
+            return None
+
+        relation_type = st.radio(
+            label="Tipo de relação",
+            options=relation_options,
+            index=0,
+            disabled=disabled,
+        )
+
+        placeholder = "Selecione uma atividade"
+        options = [placeholder, *activities]
+
         col1, col2 = st.columns(2)
-
         with col1:
-            predecessor = st.multiselect(label="Predecessor", options=['A', 'B', 'C', 'D', 'E'])
-
+            predecessor = st.selectbox(
+                label="Predecessora",
+                options=options,
+                index=0,
+                disabled=disabled,
+            )
         with col2:
-            sucessor = st.multiselect(label="Sucessor", options=['A', 'B', 'C', 'D', 'E'])
+            successor = st.selectbox(
+                label="Sucessora",
+                options=options,
+                index=0,
+                disabled=disabled,
+            )
+
+        if disabled:
+            return None
+
+        if predecessor == placeholder or successor == placeholder:
+            st.warning("Selecione uma atividade para cada posição da relação.")
+            return None
+
+        if predecessor == successor:
+            st.warning("Escolha atividades diferentes para predecessor e sucessora.")
+            return None
+
+        if relation_type == "Eventually Follows":
+            flt = EventuallyFollowsFilter(predecessor, successor)
+        else:
+            flt = DirectlyFollowsFilter(predecessor, successor)
+
+        try:
+            return event_view.filter(flt)
+        except FilterError as exc:
+            st.error(str(exc))
+            return None
