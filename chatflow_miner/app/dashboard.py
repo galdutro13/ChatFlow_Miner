@@ -61,12 +61,15 @@ if current_selected is not None:
         selected_index = 0
 
 st.selectbox(
-    label="Modelos de processo",
+    label="**Modelos de processo**",
     options=model_names,
     index=selected_index,
     key="selected_model",  # Referenciando o estado da sessão st.session_state.selected_model
     placeholder=None,
+    help="Modelos de processos gerados podem ser encontrados aqui."
 )
+
+st.divider(width="stretch")
 
 if current_selected is None:
     # Exibe interface de filtros; desabilita quando não há log carregado

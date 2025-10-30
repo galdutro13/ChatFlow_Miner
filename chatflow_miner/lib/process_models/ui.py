@@ -219,4 +219,7 @@ def render_saved_model_ui(selected_name: str) -> None:
         rows.append({"Métrica": label, "Valor": display})
 
     metrics_df = pd.DataFrame(rows).set_index("Métrica")
+    with st.popover("Ajuda"):
+        st.markdown("**Fitness:** Quão bem o modelo consegue reproduzir o comportamento registrado no log de eventos.\n\n**Precisão:** Quão pouco comportamento extra o modelo permite além do que de fato aparece no log de eventos.\n\n**Generalização:** Quão bem o modelo permite comportamentos plausíveis, porém não observados, sem apenas memorizar o log.\n\n**Simplicidade:** Quão compacto e fácil de entender é o modelo, mantendo a capacidade de explicar o log.")
+
     st.table(metrics_df)

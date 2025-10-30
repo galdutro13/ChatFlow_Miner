@@ -28,7 +28,7 @@ from chatflow_miner.lib.state import get_log_eventos
 @st.fragment
 def filter_section(*, disabled: bool = False):
     """Fragmento reutilizável para seção de filtros em Streamlit."""
-    st.markdown("Filtro de dados - <u>Em construção</u>", unsafe_allow_html=True)
+    st.markdown("#### Filtro de dados - <u>Em construção</u>", unsafe_allow_html=True)
     event_log_view = filter_by_agents(disabled)
     event_log_view = filter_by_variants(event_log_view, disabled) or event_log_view
     event_log_view = temporal_filter(event_log_view, disabled) or event_log_view
@@ -133,6 +133,7 @@ def process_model_selector(disabled: bool) -> Any:
         format_func=lambda opt: labels.get(opt, opt),
         key="process_model_type",
         disabled=disabled,
+        help="Selecione o tipo de modelo de processo que deseje gerar."
     )
     selected_model_type = st.session_state["process_model_type"]
     return selected_model_type
@@ -151,7 +152,7 @@ def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView
     """
     df = get_log_eventos(which="log_eventos")
     if df is None:
-        st.multiselect("Filtro de VARIANTE", [], [], disabled=disabled)
+        st.multiselect("Filtrar por **Variante**", [], [], disabled=disabled, help="Permite selecionar uma ou mais variantes presentes no log de eventos")
         return None
     result = CaseAggView(base_df=df).with_aggregator(CaseVariantAggregator()).compute()
 
@@ -191,7 +192,7 @@ def filter_by_agents(disabled: bool) -> EventLogView:
         EventLogView: Um EventLogView filtrado pelo agente selecionado ('chatbot', 'cliente' ou 'ambos').
     """
     sel = st.segmented_control(
-        "Filtro de AGENTE",
+        "Filtrar por AGENTE",
         ["chatbot", "cliente", "ambos"],
         selection_mode="single",
         default="ambos",
