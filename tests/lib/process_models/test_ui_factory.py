@@ -27,7 +27,7 @@ def test_resolve_model_supports_performance_alias_and_default():
         importlib.invalidate_caches()
 
         from chatflow_miner.lib.process_models.dfg import DFGModel, PerformanceDFGModel
-        from chatflow_miner.lib.process_models.ui import _resolve_model
+        from chatflow_miner.lib.ui.process_models.ui import _resolve_model
 
         default_model = _resolve_model(None)
         assert isinstance(default_model, DFGModel)

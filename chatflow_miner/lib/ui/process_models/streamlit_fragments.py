@@ -6,12 +6,12 @@ from collections.abc import Iterable, Mapping
 import pandas as pd
 import streamlit as st
 
-from ..event_log.view import EventLogView
-from ..state.manager import set_selected_model
-from .base import BaseProcessModel
-from .dfg import DFGModel, PerformanceDFGModel
-from .petri_net import PetriNetModel
-from .view import ProcessModelView
+from chatflow_miner.lib.event_log.view import EventLogView
+from chatflow_miner.lib.state.manager import set_selected_model
+from chatflow_miner.lib.process_models.base import BaseProcessModel
+from chatflow_miner.lib.process_models.dfg import DFGModel, PerformanceDFGModel
+from chatflow_miner.lib.process_models.petri_net import PetriNetModel
+from chatflow_miner.lib.process_models.view import ProcessModelView
 
 LOGGER = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ def show_generated_model_dialog() -> None:
 @st.fragment
 def render_saved_model_ui(selected_name: str) -> None:
     """Renderiza o modelo salvo na área principal, substituindo a UI de filtros."""
-    from ..state.manager import get_process_model  # import local para evitar ciclos
+    from chatflow_miner.lib.state import get_process_model  # import local para evitar ciclos
 
     view = get_process_model(selected_name)
     if view is None:

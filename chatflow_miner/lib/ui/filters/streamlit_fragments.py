@@ -18,7 +18,7 @@ from chatflow_miner.lib.filters.builtins import (
     EventuallyFollowsFilter,
     TimeWindowFilter,
 )
-from chatflow_miner.lib.process_models.ui import (
+from chatflow_miner.lib.ui.process_models import (
     generate_process_model,
     show_generated_model_dialog,
 )

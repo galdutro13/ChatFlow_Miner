@@ -1,8 +1,8 @@
 import streamlit as st
 
-from chatflow_miner.lib.filters.streamlit_fragments import filter_section
+from chatflow_miner.lib.ui.filters.streamlit_fragments import filter_section
 from chatflow_miner.lib.inputs import input_dataset
-from chatflow_miner.lib.process_models.ui import render_saved_model_ui
+from chatflow_miner.lib.ui.process_models import render_saved_model_ui
 from chatflow_miner.lib.state import (
     get_log_eventos,
     get_selected_model,
