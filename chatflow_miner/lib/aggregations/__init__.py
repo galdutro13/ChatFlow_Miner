@@ -9,6 +9,7 @@ from __future__ import annotations
 # Concrete aggregators
 from chatflow_miner.lib.aggregations.aggregators import (
     CaseDateAggregator,
+    CaseDurationAggregator,
     CaseVariantAggregator,
 )
 
@@ -51,6 +52,7 @@ __all__ = [
     "BaseCaseAggregator",
     "CaseVariantAggregator",
     "CaseDateAggregator",
+    "CaseDurationAggregator",
     "CaseAggView",
     "AGGREGATOR_REGISTRY",
     "register_aggregator",

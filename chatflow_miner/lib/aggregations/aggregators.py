@@ -13,6 +13,7 @@ from chatflow_miner.lib.constants import (
     COLUMN_ACTIVITY,
     COLUMN_AGENT,
     COLUMN_CASE_ID,
+    COLUMN_END_TS,
     COLUMN_EVENT_ID,
     COLUMN_START_TS,
 )
@@ -134,3 +135,47 @@ class CaseDateAggregator(BaseCaseAggregator):
         st = pd.to_datetime(case_df[COLUMN_START_TS], errors="coerce", format="mixed")
         d = st.min()
         return None if pd.isna(d) else d.date().isoformat()
+
+
+class CaseDurationAggregator(BaseCaseAggregator):
+    """Calcula a duração total de cada caso como ``pd.Timedelta``.
+
+    Pré-requisitos
+    ---------------
+    - ``NormalizeTimestampsOp`` deve ser aplicado antes da agregação para
+      garantir que as colunas de timestamp estejam normalizadas.
+    - Em caso de ``END_TIMESTAMP`` ausente ou inválido, o evento é tratado
+      como se terminasse no ``START_TIMESTAMP`` correspondente.
+    """
+
+    required_columns = (COLUMN_CASE_ID, COLUMN_START_TS, COLUMN_END_TS)
+
+    def prepare(self, df: pd.DataFrame) -> None:
+        self._check_columns(df)
+        return None
+
+    def compute_case(self, case_df: pd.DataFrame, state: Any) -> pd.Timedelta:
+        start_ts = pd.to_datetime(
+            case_df[COLUMN_START_TS], errors="coerce", format="mixed"
+        )
+        end_ts = pd.to_datetime(
+            case_df[COLUMN_END_TS], errors="coerce", format="mixed"
+        )
+
+        if start_ts.empty:
+            return pd.Timedelta(0)
+
+        start_min = start_ts.min()
+        if pd.isna(start_min):
+            return pd.Timedelta(0)
+
+        # Substitui END_TIMESTAMP ausente/NaT pelo START_TIMESTAMP do evento
+        end_filled = end_ts.fillna(start_ts)
+        end_max = end_filled.max()
+        if pd.isna(end_max):
+            end_max = start_min
+
+        duration = end_max - start_min
+        if isinstance(duration, pd.Timedelta):
+            return duration
+        return pd.Timedelta(duration)

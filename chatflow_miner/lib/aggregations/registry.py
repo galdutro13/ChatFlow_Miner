@@ -7,6 +7,7 @@ from typing import Any
 
 from chatflow_miner.lib.aggregations.aggregators import (
     CaseDateAggregator,
+    CaseDurationAggregator,
     CaseVariantAggregator,
 )
 from chatflow_miner.lib.aggregations.base import BaseCaseAggregator
@@ -15,6 +16,7 @@ from chatflow_miner.lib.aggregations.exceptions import AggregationError
 AGGREGATOR_REGISTRY: dict[str, type[BaseCaseAggregator]] = {
     "variant": CaseVariantAggregator,
     "case_date": CaseDateAggregator,
+    "case_duration": CaseDurationAggregator,
 }
 
 

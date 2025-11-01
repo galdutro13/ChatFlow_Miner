@@ -1,6 +1,9 @@
 import streamlit as st
 
-from chatflow_miner.lib.ui.dashboard import model_discovery
+from chatflow_miner.lib.ui.dashboard import (
+    model_discovery,
+    render_exploratory_analysis,
+)
 from chatflow_miner.lib.inputs import input_dataset
 from chatflow_miner.lib.state import (
     get_log_eventos,
@@ -49,6 +52,6 @@ tab_discover, tab_anexp, tab_anagent = st.tabs(["Descoberta de modelo de process
 with tab_discover:
     model_discovery(disabled=disabled)
 with tab_anexp:
-    st.text("Análise exploratória")
+    render_exploratory_analysis()
 with tab_anagent:
     st.text("Análise de agentes")
