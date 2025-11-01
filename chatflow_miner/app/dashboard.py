@@ -12,10 +12,7 @@ from chatflow_miner.lib.state import (
 st.set_page_config(page_title="ChatFlow Miner", layout="wide")
 initialize_session_state()
 
-st.sidebar.title("ChatFlow Miner")
-st.sidebar.write("Descoberta de modelo de processo")
-st.sidebar.write("Análise exploratória")
-st.sidebar.write("Análise de agentes")
+st.title("ChatFlow Miner")
 
 col1, col2 = st.columns(2)
 
@@ -46,4 +43,12 @@ with col2:
     else:
         st.text("Nenhum arquivo carregado.")
 
-model_discovery(disabled=disabled)
+tab_discover, tab_anexp, tab_anagent = st.tabs(["Descoberta de modelo de processo",
+                                                "Análise exploratória",
+                                                "Análise de agentes"])
+with tab_discover:
+    model_discovery(disabled=disabled)
+with tab_anexp:
+    st.text("Análise exploratória")
+with tab_anagent:
+    st.text("Análise de agentes")
