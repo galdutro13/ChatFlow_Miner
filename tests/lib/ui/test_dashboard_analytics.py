@@ -8,7 +8,7 @@ from chatflow_miner.lib.constants import (
     COLUMN_EVENT_ID,
     COLUMN_START_TS,
 )
-from chatflow_miner.lib.ui.dashboard.analytics import (
+from chatflow_miner.lib.ui.dashboard.exploratory_analysis import (
     compute_activity_histogram,
     compute_case_durations,
     compute_events_per_period,
