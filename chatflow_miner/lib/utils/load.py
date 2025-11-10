@@ -18,21 +18,36 @@ def load_dataset(file: str, load_options: dict[Any, Any]) -> pd.DataFrame:
     Carrega um arquivo de log de eventos em formato CSV ou XES e retorna um DataFrame do Pandas.
     """
     try:
-        df = pd.read_csv(file, sep=load_options["sep"])
-        cols = df.columns.tolist()
-        if "duration_seconds" in cols:
-            df.drop(columns="duration_seconds", inplace=True)
+        df = pd.read_csv(file, sep=load_options.get("sep", ","))
+        df = df.drop(columns="duration_seconds", errors="ignore").copy()
 
         verify_format(df)
 
-        df[COLUMN_START_TS] = pd.to_datetime(df[COLUMN_START_TS])
-        df[COLUMN_END_TS] = pd.to_datetime(df[COLUMN_END_TS])
+        for column in (COLUMN_CASE_ID, COLUMN_ACTIVITY):
+            df[column] = df[column].astype("string").str.strip()
+            empty_mask = df[column].fillna("").eq("")
+            df.loc[empty_mask, column] = pd.NA
+
+        for column in (COLUMN_START_TS, COLUMN_END_TS):
+            df[column] = df[column].astype("string").str.strip()
+            empty_mask = df[column].fillna("").eq("")
+            df.loc[empty_mask, column] = pd.NA
+            df[column] = pd.to_datetime(df[column])
+
+        required_columns = [
+            COLUMN_CASE_ID,
+            COLUMN_ACTIVITY,
+            COLUMN_START_TS,
+            COLUMN_END_TS,
+        ]
+        missing_mask = df[required_columns].isna().any(axis=1)
+        if missing_mask.any():
+            df = df.loc[~missing_mask].copy()
 
         log = pm4py.format_dataframe(
             df,
             case_id=COLUMN_CASE_ID,
             activity_key=COLUMN_ACTIVITY,
-            # timestamp_key=COLUMN_START_TS)
             timestamp_key=COLUMN_END_TS,
             start_timestamp_key=COLUMN_START_TS,
         )
