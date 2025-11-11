@@ -258,7 +258,7 @@ def render_exploratory_analysis() -> None:
                 "length": "Comprimento",
             }
         )
-        st.dataframe(display_df, use_container_width=True)
+        st.dataframe(display_df, width='stretch')
 
     st.divider()
 
