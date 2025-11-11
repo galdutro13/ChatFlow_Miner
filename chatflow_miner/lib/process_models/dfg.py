@@ -1,12 +1,18 @@
 import logging
 import math
+import sys
 from typing import Any, Dict, Tuple
 
 import pandas as pd
 import pm4py
 from graphviz import Digraph
 
-from chatflow_miner.lib.constants import COLUMN_END_TS, COLUMN_START_TS
+from chatflow_miner.lib.constants import (
+    COLUMN_ACTIVITY,
+    COLUMN_CASE_ID,
+    COLUMN_END_TS,
+    COLUMN_START_TS,
+)
 
 from .base import BaseProcessModel
 
@@ -239,8 +245,83 @@ class DFGModel(BaseProcessModel):
         :param df: DataFrame de eventos formatado.
         :returns: Tupla contendo o DFG, atividades iniciais e atividades finais.
         """
-        # Implementação específica para construir o DFG
-        dfg, start_activity, end_activity = pm4py.discover_dfg(df)
+        # pm4py espera colunas no padrão XES (concept:name, case:concept:name, ...).
+        # Alguns fluxos de teste/uso podem fornecer DataFrames somente com as
+        # colunas do domínio (CASE_ID/ACTIVITY/START_TIMESTAMP/END_TIMESTAMP).
+        # Normalizamos para evitar exceções de "colunas insuficientes".
+
+        pm_case_key = "case:concept:name"
+        pm_activity_key = "concept:name"
+        pm_timestamp_key = "time:timestamp"
+        pm_start_key = "start:timestamp"
+
+        required_pm_cols = {pm_case_key, pm_activity_key, pm_timestamp_key}
+
+        if required_pm_cols.issubset(df.columns):
+            prepared_df = df
+        else:
+            prepared_df = df.copy()
+
+            def _rename_first_available(
+                candidates: tuple[str, ...], target: str
+            ) -> None:
+                for column in candidates:
+                    if column in prepared_df.columns:
+                        if column != target:
+                            prepared_df.rename(columns={column: target}, inplace=True)
+                        return
+
+            _rename_first_available(
+                (pm_case_key, COLUMN_CASE_ID),
+                pm_case_key,
+            )
+            _rename_first_available(
+                (pm_activity_key, COLUMN_ACTIVITY),
+                pm_activity_key,
+            )
+
+            if pm_case_key in prepared_df.columns:
+                prepared_df[pm_case_key] = prepared_df[pm_case_key].astype("string")
+            if pm_activity_key in prepared_df.columns:
+                prepared_df[pm_activity_key] = prepared_df[pm_activity_key].astype(
+                    "string"
+                )
+
+            # Prioriza colunas reais de timestamp; caso nenhuma exista, gera uma
+            # coluna sintética ordenada para satisfazer o requisito do pm4py.
+            timestamp_candidates = (
+                pm_timestamp_key,
+                COLUMN_END_TS,
+                COLUMN_START_TS,
+            )
+            current_timestamp = next(
+                (col for col in timestamp_candidates if col in prepared_df.columns),
+                None,
+            )
+            if current_timestamp is None:
+                prepared_df[pm_timestamp_key] = pd.to_datetime(
+                    pd.RangeIndex(len(prepared_df)), unit="ns"
+                )
+            elif current_timestamp != pm_timestamp_key:
+                prepared_df.rename(
+                    columns={current_timestamp: pm_timestamp_key}, inplace=True
+                )
+
+            # Se houver timestamp de início, renomeia também para manter
+            # consistência com o formato XES esperado.
+            start_candidates = (pm_start_key, COLUMN_START_TS)
+            current_start = next(
+                (col for col in start_candidates if col in prepared_df.columns),
+                None,
+            )
+            if current_start is not None and current_start != pm_start_key:
+                prepared_df.rename(columns={current_start: pm_start_key}, inplace=True)
+
+            # Caso as colunas essenciais continuem ausentes, permita que o pm4py
+            # levante o erro — não tentamos adivinhar um case/activity inexistente.
+
+        pm4py_module = sys.modules.get("pm4py", pm4py)
+        dfg, start_activity, end_activity = pm4py_module.discover_dfg(prepared_df)
         return dfg, start_activity, end_activity
 
     def to_graphviz(
@@ -347,7 +428,8 @@ class PerformanceDFGModel(BaseProcessModel):
             - start_activities: dicionário/estrutura com atividades iniciais.
             - end_activities: dicionário/estrutura com atividades finais.
         """
-        dfg, start_activity, end_activity = pm4py.discover_performance_dfg(
+        pm4py_module = sys.modules.get("pm4py", pm4py)
+        dfg, start_activity, end_activity = pm4py_module.discover_performance_dfg(
             df,
         )
         return dfg, start_activity, end_activity

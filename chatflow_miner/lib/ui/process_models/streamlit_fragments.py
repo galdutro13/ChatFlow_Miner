@@ -9,8 +9,6 @@ import streamlit as st
 from chatflow_miner.lib.event_log.view import EventLogView
 from chatflow_miner.lib.state.manager import set_selected_model
 from chatflow_miner.lib.process_models.base import BaseProcessModel
-from chatflow_miner.lib.process_models.dfg import DFGModel, PerformanceDFGModel
-from chatflow_miner.lib.process_models.petri_net import PetriNetModel
 from chatflow_miner.lib.process_models.view import ProcessModelView
 
 LOGGER = logging.getLogger(__name__)
@@ -42,24 +40,34 @@ def name_is_unique(name: str, existing: Iterable[str]) -> bool:
 # Model generation and render
 # -----------------------------
 
-_MODEL_FACTORY: Mapping[str, type[BaseProcessModel]] = {
-    "dfg": DFGModel,
-    "performance-dfg": PerformanceDFGModel,
-    "performance_dfg": PerformanceDFGModel,
-    "petri-net": PetriNetModel,
-}
 _CANONICAL_KEYS = ("dfg", "performance-dfg", "petri-net")
 
 
+def _get_model_factory() -> Mapping[str, type[BaseProcessModel]]:
+    """Return a fresh mapping of model aliases to concrete classes."""
+
+    from chatflow_miner.lib.process_models.dfg import DFGModel, PerformanceDFGModel
+    from chatflow_miner.lib.process_models.petri_net import PetriNetModel
+
+    return {
+        "dfg": DFGModel,
+        "performance-dfg": PerformanceDFGModel,
+        "performance_dfg": PerformanceDFGModel,
+        "petri-net": PetriNetModel,
+    }
+
+
 def _resolve_model(model: BaseProcessModel | str | None) -> BaseProcessModel:
+    model_factory = _get_model_factory()
+
     if model is None:
-        return DFGModel()
+        return model_factory["dfg"]()
     if isinstance(model, BaseProcessModel):
         return model
 
     key = str(model).strip().casefold()
     try:
-        model_cls = _MODEL_FACTORY[key]
+        model_cls = model_factory[key]
     except KeyError as exc:  # pragma: no cover - defensive path
         available = "', '".join(_CANONICAL_KEYS)
         raise ValueError(
