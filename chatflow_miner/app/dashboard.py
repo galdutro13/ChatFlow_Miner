@@ -2,6 +2,7 @@ import streamlit as st
 
 from chatflow_miner.lib.ui.dashboard import (
     model_discovery,
+    render_agent_analysis,
     render_exploratory_analysis,
 )
 from chatflow_miner.lib.inputs import input_dataset
@@ -54,4 +55,4 @@ with tab_discover:
 with tab_anexp:
     render_exploratory_analysis()
 with tab_anagent:
-    st.text("Análise de agentes")
+    render_agent_analysis()
