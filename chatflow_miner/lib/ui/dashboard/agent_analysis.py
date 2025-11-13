@@ -1,20 +1,25 @@
 """Fragmento de análise de agentes focado em interações da IA."""
-
 from __future__ import annotations
 
 from typing import List
 
 import pandas as pd
+import pm4py
 import streamlit as st
 
 from chatflow_miner.lib.constants import (
     COLUMN_ACTIVITY,
     COLUMN_AGENT,
+    COLUMN_CASE_ID,
     COLUMN_END_TS,
     COLUMN_RESOURCE,
     COLUMN_START_TS,
 )
+from chatflow_miner.lib.event_log import EventLogView
 from chatflow_miner.lib.state import get_log_eventos
+from chatflow_miner.lib.ui.process_models.streamlit_fragments import (
+    generate_process_model,
+)
 
 
 def _normalise_resource_tokens(value: str) -> List[str]:
@@ -91,7 +96,7 @@ def render_agent_analysis() -> None:
 
     st.subheader("Recursos utilizados pelo agente IA")
     st.bar_chart(resources_df.set_index("Recurso")[["Frequência"]])
-    st.dataframe(resources_df, width='stretch')
+    st.dataframe(resources_df, use_container_width=True)
 
     st.subheader("Tendência de uso por recurso")
     if COLUMN_START_TS not in exploded_resources.columns:
@@ -175,13 +180,110 @@ def render_agent_analysis() -> None:
                         if chart_label == "Área":
                             st.area_chart(
                                 selected_timeseries,
-                                width='stretch',
+                                use_container_width=True,
                             )
                         else:
                             st.line_chart(
                                 selected_timeseries,
-                                width='stretch',
+                                use_container_width=True,
                             )
+
+    missing_process_columns = [
+        column
+        for column in (COLUMN_CASE_ID, COLUMN_START_TS, COLUMN_END_TS)
+        if column not in exploded_resources.columns
+    ]
+    if missing_process_columns:
+        st.info(
+            "O log não possui colunas suficientes para gerar o modelo de processo por recurso."
+        )
+    else:
+        resource_process_df = exploded_resources.dropna(
+            subset=[COLUMN_CASE_ID, COLUMN_START_TS, COLUMN_END_TS]
+        ).copy()
+
+        if resource_process_df.empty:
+            st.info(
+                "Não há dados suficientes para gerar o modelo de processo por recurso."
+            )
+        else:
+            resource_process_df[COLUMN_RESOURCE] = (
+                resource_process_df["resource"].astype("string").str.strip()
+            )
+            resource_process_df = resource_process_df.dropna(
+                subset=[COLUMN_RESOURCE]
+            )
+            resource_process_df = resource_process_df.loc[
+                resource_process_df[COLUMN_RESOURCE].ne("")
+            ]
+
+            if resource_process_df.empty:
+                st.info(
+                    "Não há recursos válidos para gerar o modelo de processo por recurso."
+                )
+            else:
+                columns_to_keep = [
+                    column
+                    for column in (
+                        COLUMN_CASE_ID,
+                        COLUMN_START_TS,
+                        COLUMN_END_TS,
+                        COLUMN_RESOURCE,
+                    )
+                    if column in resource_process_df.columns
+                ]
+                resource_process_df = resource_process_df[columns_to_keep]
+
+                try:
+                    formatted_resource_log = pm4py.format_dataframe(
+                        resource_process_df,
+                        case_id=COLUMN_CASE_ID,
+                        activity_key=COLUMN_RESOURCE,
+                        timestamp_key=COLUMN_END_TS,
+                        start_timestamp_key=COLUMN_START_TS,
+                    )
+                except Exception as exc:
+                    st.error(
+                        "Falha ao preparar o log para gerar o modelo de processo por recurso."
+                    )
+                    st.exception(exc)
+                else:
+                    try:
+                        resource_log_view = EventLogView(formatted_resource_log)
+                        process_model_view = generate_process_model(resource_log_view)
+                        graphviz = process_model_view.to_graphviz(
+                            bgcolor="white", rankdir="LR"
+                        )
+
+                        col_subheader, col_metrics = st.columns(2, gap="large")
+                        with col_subheader:
+                            st.subheader("Modelo de processo por recurso")
+                        with col_metrics:
+                            metrics = process_model_view.quality_metrics()
+                            rows = []
+                            ordered_keys = [
+                                ("fitness", "Fitness"),
+                                ("precision", "Precisão"),
+                                ("generalization", "Generalização"),
+                                ("simplicity", "Simplicidade"),
+                            ]
+                            for key, label in ordered_keys:
+                                value = metrics.get(key)
+                                if isinstance(value, (int, float)):
+                                    display = f"{value:.3f}"
+                                else:
+                                    display = "N/A"
+                                rows.append({"Métrica": label, "Valor": display})
+                            metrics_df = pd.DataFrame(rows).set_index("Métrica")
+                            with st.popover("Métricas do Modelo"):
+                                st.table(metrics_df)
+
+                        st.graphviz_chart(graphviz, use_container_width=True)
+                    except Exception as exc:
+                        st.error(
+                            "Falha ao gerar ou renderizar o modelo de processo por recurso."
+                        )
+                        st.exception(exc)
 
     combination_labels = normalised_per_event.apply(
         lambda tokens: ", ".join(sorted(set(tokens)))
@@ -202,7 +304,7 @@ def render_agent_analysis() -> None:
     combination_df = combination_counts.reset_index()
 
     st.subheader("Combinações de recursos do agente IA")
-    st.dataframe(combination_df, width='stretch')
+    st.dataframe(combination_df, use_container_width=True)
 
     st.caption(
         "As combinações representam sinergias entre recursos atribuídos a um mesmo evento do agente IA."
@@ -260,5 +362,5 @@ def render_agent_analysis() -> None:
 
     st.dataframe(
         filtered_table.style.background_gradient(axis=None),
-        width='stretch',
+        use_container_width=True,
     )
