@@ -6,6 +6,7 @@ from chatflow_miner.lib.ui.process_models import render_saved_model_ui
 
 
 def model_discovery(disabled: bool):
+    log_loaded = bool(disabled)
     model_names = list(st.session_state.process_models.names)
 
     selected_index = 0
@@ -27,11 +28,16 @@ def model_discovery(disabled: bool):
         help="Modelos de processos gerados podem ser encontrados aqui."
     )
 
-    st.divider(width="stretch")
+    st.divider()
+    preview_area = st.container()
+    empty_state = st.empty()
 
     if current_selected is None:
+        empty_state.info(
+            "Nenhum modelo selecionado. Use os filtros e clique em **Gerar modelo**."
+        )
         # Exibe interface de filtros; desabilita quando não há log carregado
-        filter_section(disabled=not disabled)
+        filter_section(disabled=not log_loaded, preview_area=preview_area)
     else:
         # Exibe modelo salvo selecionado independentemente de haver log carregado
         render_saved_model_ui(current_selected)

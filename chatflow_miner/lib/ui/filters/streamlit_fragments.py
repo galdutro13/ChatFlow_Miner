@@ -8,7 +8,11 @@ from chatflow_miner.lib.aggregations import (
     CaseDateAggregator,
     CaseVariantAggregator,
 )
-from chatflow_miner.lib.constants import COLUMN_ACTIVITY, COLUMN_START_TS
+from chatflow_miner.lib.constants import (
+    COLUMN_ACTIVITY,
+    COLUMN_CASE_ID,
+    COLUMN_START_TS,
+)
 from chatflow_miner.lib.event_log.view import EventLogView
 from chatflow_miner.lib.filters.base.exceptions import FilterError
 from chatflow_miner.lib.filters.builtins import (
@@ -25,22 +29,48 @@ from chatflow_miner.lib.ui.process_models import (
 from chatflow_miner.lib.state import get_log_eventos
 
 
-@st.fragment
-def filter_section(*, disabled: bool = False):
+def filter_section(*, disabled: bool = False, preview_area=None):
     """Fragmento reutilizável para seção de filtros em Streamlit."""
-    st.markdown("#### Filtro de dados - <u>Em construção</u>", unsafe_allow_html=True)
-    event_log_view = filter_by_agents(disabled)
-    event_log_view = filter_by_variants(event_log_view, disabled) or event_log_view
-    event_log_view = temporal_filter(event_log_view, disabled) or event_log_view
+    if "selected_variants" not in st.session_state:
+        st.session_state.selected_variants = []
 
-    selected_model_type = process_model_selector(disabled)
+    df = get_log_eventos(which="log_eventos")
+    base_df = df if df is not None else pd.DataFrame()
+    event_log_view = EventLogView(base_df=base_df)
+    filters_disabled = disabled or base_df.empty
 
-    event_log_view = advanced_filter(event_log_view, disabled) or event_log_view
+    with st.expander("Filtros", expanded=True):
+        with st.expander("Agente", expanded=False):
+            st.info(
+                "Foque a análise nos atendimentos do chatbot, do humano ou de ambos para comparar padrões de condução.",
+                icon="ℹ️",
+            )
+            event_log_view = filter_by_agents(event_log_view, filters_disabled)
+        with st.expander("Variantes", expanded=False):
+            st.info(
+                "Priorize as variantes mais frequentes para ver quais caminhos impactam volume ou gargalos.",
+                icon="ℹ️",
+            )
+            event_log_view = filter_by_variants(event_log_view, filters_disabled) or event_log_view
+        with st.expander("Janela Temporal", expanded=False):
+            st.info(
+                "Restringe o período analisado para evidenciar tendências sazonais ou incidentes pontuais.",
+                icon="ℹ️",
+            )
+            event_log_view = temporal_filter(event_log_view, filters_disabled) or event_log_view
 
-    st.dataframe(event_log_view.compute())
+        with st.expander("Relações Directly/Eventually Follows", expanded=False):
+            st.info(
+                "Defina relações Directly/Eventually Follows para testar hipóteses de sequência, como 'Login precede Pagamento'.",
+                icon="ℹ️",
+            )
+            event_log_view = activity_relationship_filter(event_log_view, filters_disabled) or event_log_view
 
-    # Área inferior com botão à direita
-    generate_model(disabled, event_log_view, selected_model_type)
+        selected_model_type = model_type_selector(filters_disabled)
+
+        generate_model(filters_disabled, event_log_view, selected_model_type)
+
+    render_preview(event_log_view, preview_area)
 
 
 def generate_model(
@@ -48,50 +78,39 @@ def generate_model(
 ):
     """
     Gera o modelo de processo quando o botão "Gerar" é acionado na UI do Streamlit.
-
-    Parâmetros:
-        disabled (bool): Se True, o botão de geração é desabilitado.
-        event_log_view (EventLogView | None): A visão do log de eventos a ser usada como base
-            para a geração do modelo. Pode ser None, caso em que a geração pode falhar
-            dependendo da implementação de generate_process_model.
-        selected_model_type (Any): Identificador do tipo de modelo a ser gerado (ex.: "dfg",
-            "performance-dfg", "petri-net").
-
-    Comportamento:
-        - Renderiza um botão na coluna direita da UI. Ao ser clicado:
-            * Exibe um spinner "Gerando modelo...".
-            * Chama generate_process_model(event_log_view, model=selected_model_type).
-            * Armazena o modelo gerado em st.session_state['latest_generated_model'].
-            * Abre um diálogo de visualização/salvamento via show_generated_model_dialog().
-        - Em caso de ValueError, mostra a mensagem de erro ao usuário.
-        - Em caso de exceção genérica, mostra uma mensagem de falha e imprime a exceção.
-
-    Efeitos colaterais:
-        - Modifica st.session_state['latest_generated_model'].
-        - Produz saídas visuais na UI do Streamlit (spinner, mensagens de erro, diálogo).
-
-    Observações:
-        - A função é voltada apenas para execução dentro de um contexto Streamlit (não retorna valor significativo).
     """
-    _, right_col = st.columns([6, 1])
-    with right_col:
-        if st.button("Gerar", key="filters.generate", disabled=disabled):
-            try:
-                with st.spinner("Gerando modelo..."):
-                    view = generate_process_model(
-                        event_log_view, model=selected_model_type
-                    )
-                    st.session_state.latest_generated_model = view
-                # Abre diálogo para visualização e salvamento
-                show_generated_model_dialog()
-            except ValueError as exc:
-                st.error(str(exc))
-            except Exception as exc:
-                st.error("Falha ao gerar o modelo de processo.")
-                st.exception(exc)
+    running = st.session_state.get("processing_model", False)
+    button_disabled = disabled or running
+    if st.button("Gerar", key="filters.generate", disabled=button_disabled):
+        if event_log_view is None:
+            st.warning("Carregue um log para gerar o modelo de processo.")
+            return
+        st.session_state.processing_model = True
+        st.session_state.processing_error = False
+        try:
+            with st.status("Gerando modelo...", state="running", expanded=True) as status:
+                status.write("Pré-processando log e filtros...")
+                view = generate_process_model(event_log_view, model=selected_model_type)
+
+                status.write("Minerando modelo selecionado...")
+                view.compute()
+
+                status.write("Preparando visualização e métricas...")
+                st.session_state.latest_generated_model = view
+                status.update(label="Modelo gerado com sucesso", state="complete", expanded=False)
+            show_generated_model_dialog()
+        except ValueError as exc:
+            st.session_state.processing_error = True
+            st.error(str(exc))
+        except Exception as exc:
+            st.session_state.processing_error = True
+            st.error("Falha ao gerar o modelo de processo.")
+            st.exception(exc)
+        finally:
+            st.session_state.processing_model = False
 
 
-def process_model_selector(disabled: bool) -> Any:
+def model_type_selector(disabled: bool) -> Any:
     """
     Exibe um seletor de tipo de modelo de processo na interface Streamlit e retorna
     a opção atualmente selecionada armazenada em `st.session_state`.
@@ -142,55 +161,77 @@ def process_model_selector(disabled: bool) -> Any:
 def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView | None:
     """
     Exibe e aplica um filtro de variantes de casos sobre um EventLogView usando Streamlit.
-
-    Parâmetros:
-        event_view (EventLogView): A visão do log de eventos a ser filtrada.
-        disabled (bool): Se True, desabilita a interação do filtro na interface.
-
-    Retorna:
-        EventLogView ou None: Um novo EventLogView filtrado pelas variantes selecionadas, ou None se não houver dados.
     """
     df = get_log_eventos(which="log_eventos")
-    if df is None:
-        st.multiselect("Filtrar por **Variante**", [], [], disabled=disabled, help="Permite selecionar uma ou mais variantes presentes no log de eventos")
-        return None
-    result = CaseAggView(base_df=df).with_aggregator(CaseVariantAggregator()).compute()
-
-    def gid(key: str) -> str:
-        return getattr(result[key], "variant_id", key)
-
-    seen = set()
-    variants = [v for v in result if (vid := gid(v)) not in seen and not seen.add(vid)]
-    variants.sort(key=lambda v: result[v].frequency, reverse=True)
-
-    def fmt(variant_key: str) -> str:
-        return (
-            f"freq={result[variant_key].frequency} | "
-            f"{result[variant_key].variant_id} | "
-            f"{result[variant_key].variant}"
+    if df is None or df.empty:
+        st.data_editor(
+            pd.DataFrame(columns=["variant_id", "frequency", "variant", "selected"]),
+            disabled=True,
+            hide_index=True,
         )
+        st.session_state.selected_variants = []
+        return None
 
-    selected = st.multiselect(
-        "Filtro de VARIANTE", variants, [], format_func=fmt, disabled=disabled
+    variants_per_case = (
+        CaseAggView(base_df=df).with_aggregator(CaseVariantAggregator()).compute()
     )
-    if selected:
-        cid = {gid(v) for v in selected}
-        ks = [k for k in result if gid(k) in cid]
-        if ks:
-            return event_view.filter(CaseFilter(case_ids=ks))
+    if not variants_per_case:
+        st.info("Nenhuma variante disponível para seleção.")
+        st.session_state.selected_variants = []
+        return event_view
+
+    case_ids_by_variant: dict[str, list[str]] = {}
+    variant_info_by_id: dict[str, Any] = {}
+    for case_id, info in variants_per_case.items():
+        variant_info_by_id[info.variant_id] = info
+        case_ids_by_variant.setdefault(info.variant_id, []).append(case_id)
+
+    rows = [
+        {
+            "variant_id": info.variant_id,
+            "frequency": info.frequency,
+            "variant": info.variant,
+            "selected": info.variant_id in st.session_state.selected_variants,
+        }
+        for info in sorted(
+            variant_info_by_id.values(), key=lambda itm: itm.frequency, reverse=True
+        )
+    ]
+    variants_df = pd.DataFrame(rows)
+
+    edited = st.data_editor(
+        variants_df,
+        use_container_width=True,
+        hide_index=True,
+        disabled=disabled,
+        column_config={
+            "selected": st.column_config.CheckboxColumn("Selecionar", help="Selecione variantes para manter"),
+            "variant_id": st.column_config.TextColumn("ID da variante", width="small"),
+            "frequency": st.column_config.NumberColumn("Frequência", format="%d", width="small"),
+            "variant": st.column_config.TextColumn("Atividades"),
+        },
+        key="variant-selector",
+    )
+
+    selected_ids: list[str] = []
+    if isinstance(edited, pd.DataFrame) and not edited.empty:
+        selected_ids = edited.loc[edited["selected"], "variant_id"].astype(str).tolist()
+    st.session_state.selected_variants = selected_ids
+
+    if selected_ids:
+        case_ids = [
+            case
+            for variant_id in selected_ids
+            for case in case_ids_by_variant.get(variant_id, [])
+        ]
+        if case_ids:
+            return event_view.filter(CaseFilter(case_ids=case_ids))
     return event_view
 
 
-def filter_by_agents(disabled: bool) -> EventLogView:
-    """
-    Exibe e aplica um filtro de agente sobre o EventLogView usando Streamlit.
+def filter_by_agents(event_view: EventLogView, disabled: bool) -> EventLogView:
+    """Exibe e aplica um filtro de agente sobre o EventLogView usando Streamlit."""
 
-    Parâmetros:
-        disabled (bool): Se True, desabilita a interação do filtro na interface.
-
-    Retorna:
-        EventLogView: Um EventLogView filtrado pelo agente selecionado ('chatbot', 'cliente' ou 'ambos').
-    """
     sel = st.segmented_control(
         "Filtrar por AGENTE",
         ["chatbot", "cliente", "ambos"],
@@ -198,57 +239,34 @@ def filter_by_agents(disabled: bool) -> EventLogView:
         default="ambos",
         disabled=disabled,
     )
-    df = (
-        d if (d := get_log_eventos(which="log_eventos")) is not None else pd.DataFrame()
-    )
-    view = EventLogView(base_df=df)
+    if disabled:
+        return event_view
+
     agent = {"chatbot": "ai", "cliente": "human"}.get(sel)
-    return view.filter(AgentFilter(agent=agent)) if agent else view
+    return event_view.filter(AgentFilter(agent=agent)) if agent else event_view
 
 
 def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | None:
-    """
-    Apresenta controles de filtro temporal na interface Streamlit e aplica um filtro
-    de janela temporal (TimeWindowFilter) sobre a EventLogView fornecida.
-
-    Comportamento:
-    - Se não houver dados de eventos disponíveis (get_log_eventos retorna None),
-      renderiza controles desabilitados e retorna None.
-    - Calcula opções de data a partir de agregação por caso (CaseDateAggregator),
-      apresenta sliders para data inicial e final, valida que a data final não seja
-      anterior à inicial e converte as datas selecionadas para timestamps
-      (incluindo o final do dia para a data final).
-    - Se a série de timestamps do log possuir informação de fuso (tz-aware),
-      ajusta os timestamps selecionados para o mesmo fuso horário.
-    - Retorna a EventLogView filtrada pelo TimeWindowFilter correspondente.
-
-    Parâmetros:
-        event_view (EventLogView): visão atual do log de eventos a ser filtrada.
-        disabled (bool): se True, desabilita os controles da interface Streamlit.
-
-    Retorno:
-        EventLogView ou None: a EventLogView filtrada pela janela temporal, ou None
-        se não houver dados de evento a serem filtrados.
-
-    Observações:
-    - A função exibe mensagens de erro na UI quando a data final é anterior à inicial.
-    - A janela temporal é inclusiva: a data final é ajustada para o último microssegundo do dia.
-    """
-    st.markdown("Filtro temporal", unsafe_allow_html=True)
+    """Aplica filtro temporal com janela unificada."""
     df = get_log_eventos(which="log_eventos")
 
-    if df is None:
-        col1, col2 = st.columns(2)
-        for lbl, val, col in [("Data inicial", 1970, col1), ("Data final", 2025, col2)]:
-            with col:
-                st.select_slider(
-                    lbl, options=[1970, 1997, 2025], value=val, disabled=disabled
-                )
+    if df is None or df.empty:
+        empty_date = pd.to_datetime("1970-01-01").date()
+        st.slider(
+            "Intervalo de datas",
+            value=(empty_date, empty_date),
+            format="YYYY-MM-DD",
+            disabled=True,
+        )
         return None
+
+    if COLUMN_START_TS not in df.columns:
+        st.info("O log carregado não possui timestamps para aplicar filtro temporal.")
+        return event_view
 
     date_options = sorted(
         {
-            d
+            pd.to_datetime(d).date()
             for d in CaseAggView(base_df=df)
             .with_aggregator(CaseDateAggregator())
             .compute()
@@ -256,21 +274,26 @@ def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | 
             if d
         }
     )
+    if not date_options:
+        st.info("Nenhuma data disponível para filtrar.")
+        return event_view
 
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.select_slider(
-            "Data inicial", date_options, date_options[0], disabled=disabled
-        )
-    with col2:
-        end_date = st.select_slider(
-            "Data final", date_options, date_options[-1], disabled=disabled
-        )
+    start_default = pd.to_datetime(date_options[0]).date()
+    end_default = pd.to_datetime(date_options[-1]).date()
+    start_date, end_date = st.slider(
+        "Intervalo de datas",
+        min_value=start_default,
+        max_value=end_default,
+        value=(start_default, end_default),
+        format="YYYY-MM-DD",
+        disabled=disabled,
+    )
 
     if end_date < start_date:
         st.error(
             "Falha ao gerar o filtro temporal: a data final não pode ser anterior à data inicial."
         )
+        return None
 
     start_ts = pd.to_datetime(start_date).normalize()
     end_ts = (
@@ -285,102 +308,106 @@ def temporal_filter(event_view: EventLogView, disabled: bool) -> EventLogView | 
         start_ts = start_ts if start_ts.tzinfo else start_ts.tz_localize(tz)
         end_ts = end_ts if end_ts.tzinfo else end_ts.tz_localize(tz)
 
-    return event_view.filter(TimeWindowFilter(start=start_ts, end=end_ts))
+    filtered_view = event_view.filter(TimeWindowFilter(start=start_ts, end=end_ts))
+    filtered_df = filtered_view.compute()
+    num_cases = filtered_df[COLUMN_CASE_ID].nunique() if COLUMN_CASE_ID in filtered_df else len(filtered_df)
+    st.metric("Casos filtrados", num_cases)
+    return filtered_view
 
 
-def advanced_filter(event_view: EventLogView, disabled: bool) -> EventLogView | None:
+def activity_relationship_filter(
+    event_view: EventLogView, disabled: bool
+) -> EventLogView | None:
     """Renderiza filtros avançados baseados em relações entre atividades."""
 
-    relation_options = ("Eventually Follows", "Directly Follows")
-
-    with st.expander("Filtros Avançados"):
-        st.markdown(
-            "Selecione pares de atividades para manter apenas os casos em que a"
-            " sucessora ocorre após a predecessora. Use 'Directly Follows' para"
-            " exigir que a transição seja imediata, sem eventos intermediários."
+    df = get_log_eventos(which="log_eventos")
+    if df is None or COLUMN_ACTIVITY not in df.columns or df.empty:
+        st.data_editor(
+            pd.DataFrame(columns=["Predecessora", "Sucessora", "Tipo"]),
+            disabled=True,
+            hide_index=True,
+            num_rows="dynamic",
         )
+        return None
 
-        df = get_log_eventos(which="log_eventos")
-        if df is None or COLUMN_ACTIVITY not in df.columns or df.empty:
-            st.radio(
-                label="Tipo de relação",
-                options=relation_options,
-                index=0,
-                disabled=True,
-            )
-            col1, col2 = st.columns(2)
-            with col1:
-                st.selectbox(
-                    label="Predecessora",
-                    options=[""],
-                    index=0,
-                    disabled=True,
-                )
-            with col2:
-                st.selectbox(
-                    label="Sucessora",
-                    options=[""],
-                    index=0,
-                    disabled=True,
-                )
-            return None
+    activities = sorted(
+        {
+            str(value).strip()
+            for value in df[COLUMN_ACTIVITY].dropna().unique().tolist()
+            if str(value).strip()
+        }
+    )
 
-        activities = sorted(
-            {
-                str(value).strip()
-                for value in df[COLUMN_ACTIVITY].dropna().unique().tolist()
-                if str(value).strip()
-            }
-        )
+    if not activities:
+        st.info("O log carregado não possui atividades disponíveis para filtrar.")
+        return None
 
-        if not activities:
-            st.info("O log carregado não possui atividades disponíveis para filtrar.")
-            return None
+    base_rules = st.session_state.get("advanced-rules")
+    if not isinstance(base_rules, pd.DataFrame):
+        base_rules = pd.DataFrame(columns=["Predecessora", "Sucessora", "Tipo"])
 
-        relation_type = st.radio(
-            label="Tipo de relação",
-            options=relation_options,
-            index=0,
-            disabled=disabled,
-        )
+    edited = st.data_editor(
+        base_rules,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        disabled=disabled,
+        column_config={
+            "Predecessora": st.column_config.SelectboxColumn(
+                "Predecessora", options=activities, required=False
+            ),
+            "Sucessora": st.column_config.SelectboxColumn(
+                "Sucessora", options=activities, required=False
+            ),
+            "Tipo": st.column_config.SelectboxColumn(
+                "Tipo", options=["Directly Follows", "Eventually Follows"],
+                required=False,
+            ),
+        },
+        key="advanced-rules",
+    )
 
-        placeholder = "Selecione uma atividade"
-        options = [placeholder, *activities]
+    if disabled or edited is None or edited.empty:
+        return None
 
-        col1, col2 = st.columns(2)
-        with col1:
-            predecessor = st.selectbox(
-                label="Predecessora",
-                options=options,
-                index=0,
-                disabled=disabled,
-            )
-        with col2:
-            successor = st.selectbox(
-                label="Sucessora",
-                options=options,
-                index=0,
-                disabled=disabled,
-            )
+    cleaned = edited.dropna(subset=["Predecessora", "Sucessora", "Tipo"], how="any")
+    cleaned = cleaned.drop_duplicates(subset=["Predecessora", "Sucessora", "Tipo"])
 
-        if disabled:
-            return None
-
-        if predecessor == placeholder or successor == placeholder:
-            st.warning("Selecione uma atividade para cada posição da relação.")
-            return None
-
-        if predecessor == successor:
+    filters = []
+    for _, row in cleaned.iterrows():
+        if row["Predecessora"] == row["Sucessora"]:
             st.warning("Escolha atividades diferentes para predecessor e sucessora.")
-            return None
-
-        if relation_type == "Eventually Follows":
-            flt = EventuallyFollowsFilter(predecessor, successor)
+            continue
+        if row["Tipo"] == "Eventually Follows":
+            filters.append(EventuallyFollowsFilter(row["Predecessora"], row["Sucessora"]))
         else:
-            flt = DirectlyFollowsFilter(predecessor, successor)
+            filters.append(DirectlyFollowsFilter(row["Predecessora"], row["Sucessora"]))
 
+    if not filters:
+        return None
+
+    try:
+        return event_view.filter(filters)
+    except FilterError as exc:
+        st.error(str(exc))
+        return None
+
+
+def render_preview(event_log_view: EventLogView, preview_area) -> None:
+    target = preview_area if preview_area is not None else st
+    with target:
         try:
-            return event_view.filter(flt)
-        except FilterError as exc:
-            st.error(str(exc))
-            return None
+            with st.spinner("Atualizando pré-visualização…"):
+                preview_df = event_log_view.compute()
+        except Exception:
+            preview_df = event_log_view.compute()
+        st.data_editor(
+            preview_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                COLUMN_CASE_ID: st.column_config.TextColumn(
+                    "Caso", width="small", help="Identificador do caso"
+                )
+            },
+        )

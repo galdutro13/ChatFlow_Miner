@@ -19,6 +19,33 @@ initialize_session_state()
 
 st.title("ChatFlow Miner")
 
+
+def maybe_show_discovery_toast() -> str | None:
+    log_counter = st.session_state.get("log_load_counter", 0)
+    last_toast_counter = st.session_state.get("last_toast_log_counter", 0)
+    initial_shown = st.session_state.get("initial_discovery_toast_shown", False)
+
+    if not initial_shown:
+        if log_counter == 0:
+            st.toast(
+                "Envie um novo log de eventos para gerar ou visualizar modelos.",
+                icon="ℹ️",
+            )
+            st.session_state.initial_discovery_toast_shown = True
+            st.session_state.last_toast_log_counter = log_counter
+            return "initial"
+
+        st.session_state.initial_discovery_toast_shown = True
+        last_toast_counter = -1
+
+    if log_counter > last_toast_counter:
+        st.toast("Pronto para gerar ou visualizar modelos", icon="✅")
+        st.session_state.last_toast_log_counter = log_counter
+        return "ready"
+
+    return None
+
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -26,7 +53,7 @@ with col1:
     disabled = (
         load_info := get_log_eventos(which="load_info")
     ) is not None  # Desabilitar se já houver um arquivo carregado
-    col1.button(
+    st.button(
         "Carregar log de eventos",
         on_click=open_input_dialog,
         type="primary",
@@ -55,6 +82,7 @@ tab_discover, tab_anexp, tab_conformance, tab_anagent = st.tabs([
     "Análise de agentes",
 ])
 with tab_discover:
+    maybe_show_discovery_toast()
     model_discovery(disabled=disabled)
 with tab_anexp:
     render_exploratory_analysis()

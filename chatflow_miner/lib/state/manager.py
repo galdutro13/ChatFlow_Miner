@@ -42,6 +42,24 @@ def initialize_session_state() -> None:
     if "latest_generated_model" not in st.session_state:
         st.session_state.latest_generated_model = None
 
+    if "processing_model" not in st.session_state:
+        st.session_state.processing_model = False
+
+    if "processing_error" not in st.session_state:
+        st.session_state.processing_error = False
+
+    if "selected_variants" not in st.session_state:
+        st.session_state.selected_variants = []
+
+    if "log_load_counter" not in st.session_state:
+        st.session_state.log_load_counter = 0
+
+    if "last_toast_log_counter" not in st.session_state:
+        st.session_state.last_toast_log_counter = 0
+
+    if "initial_discovery_toast_shown" not in st.session_state:
+        st.session_state.initial_discovery_toast_shown = False
+
 
 def get_selected_model() -> str | None:
     """Retorna o nome do modelo de processo selecionado (ou None)."""
@@ -106,6 +124,7 @@ def set_log_eventos(log: pd.DataFrame, load_info: dict) -> None:
     """
     st.session_state.load_info = load_info
     st.session_state.log_eventos = log
+    st.session_state.log_load_counter = st.session_state.get("log_load_counter", 0) + 1
 
 
 def get_log_eventos(
