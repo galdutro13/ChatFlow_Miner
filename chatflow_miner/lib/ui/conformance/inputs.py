@@ -11,6 +11,14 @@ import streamlit as st
 
 from chatflow_miner.lib.conformance.utils import ensure_marking_obj
 
+def _init_sintetizar_modelo_state():
+    """Função para iniciar o estado do botão de sintetizar modelo"""
+    if "sintetizar_modelo" not in st.session_state:
+        st.session_state.sintetizar_modelo = False
+
+def _toggle_sistetizar_modelo():
+    """Muda o estado de sintetizar modelo para True"""
+    st.session_state.sintetizar_modelo = True
 
 def _init_normative_model_state() -> None:
     if "normative_model" not in st.session_state:
@@ -245,7 +253,9 @@ def render_normative_model_selector(log_df: Any | None = None) -> None:
             manual_input = st.text_area(
                 "Traços", placeholder="A -> B -> C\nA -> C -> D", height=120
             )
-        if st.button("Sintetizar Modelo", use_container_width=True):
+        st.button("Sintetizar Modelo", use_container_width=True, on_click=_toggle_sistetizar_modelo)
+        sintetizar_modelo = st.session_state.get("sintetizar_modelo", False)
+        if sintetizar_modelo:
             manual_lines = [line for line in manual_input.splitlines() if line.strip()]
             _discover_from_variants(log_df, selected_variants=selected, manual_traces=manual_lines)
 

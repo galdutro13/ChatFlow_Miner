@@ -119,7 +119,7 @@ def _render_alignment_tab(log_df: Any, normative_model: dict[str, Any]) -> None:
             use_container_width=True,
         )
 
-
+@st.fragment
 def render_conformance_analysis() -> None:
     log_df = get_log_eventos(which="log_eventos")
 
