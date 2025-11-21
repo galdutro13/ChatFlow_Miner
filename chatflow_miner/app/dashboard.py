@@ -75,18 +75,18 @@ with col2:
     else:
         st.text("Nenhum arquivo carregado.")
 
-tab_discover, tab_anexp, tab_conformance, tab_anagent = st.tabs([
+tab_discover, tab_anexp, tab_anagent, tab_conformance = st.tabs([
     "Descoberta de modelo de processo",
     "Análise exploratória",
-    "Conformidade",
     "Análise de agentes",
+    "Análise de Conformidade"
 ])
 with tab_discover:
     maybe_show_discovery_toast()
     model_discovery(disabled=disabled)
 with tab_anexp:
     render_exploratory_analysis()
-with tab_conformance:
-    render_conformance_analysis()
 with tab_anagent:
     render_agent_analysis()
+with tab_conformance:
+    render_conformance_analysis()
