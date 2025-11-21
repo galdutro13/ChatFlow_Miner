@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util as importlib_util
 import sys
 from typing import Any, Iterable
 
@@ -13,7 +14,7 @@ def _import_module(module_name: str) -> Any:
     if module_name in sys.modules:
         return sys.modules[module_name]
 
-    spec = importlib.util.find_spec(module_name)
+    spec = importlib_util.find_spec(module_name)
     if spec is None:
         raise MissingDependencyError(
             "O módulo pm4py é necessário para análise de conformidade. "

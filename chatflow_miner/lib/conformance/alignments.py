@@ -5,11 +5,16 @@ from typing import Any, Iterable, List, Tuple
 
 import pandas as pd
 
-from .utils import _import_module
+from .utils import _import_first_available, _import_module
 
 
 def apply_alignments(log: Any, net: Any, im: Any, fm: Any) -> list[dict[str, Any]]:
-    alignments = _import_module("pm4py.algo.conformance.alignments.algorithm")
+    alignments = _import_first_available(
+        (
+            "pm4py.algo.conformance.alignments.petri_net.algorithm",  # pm4py >=2.7
+            "pm4py.algo.conformance.alignments.algorithm",  # pm4py <=2.6
+        )
+    )
     return alignments.apply(log, net, im, fm)
 
 
