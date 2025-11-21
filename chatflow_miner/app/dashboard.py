@@ -3,6 +3,7 @@ import streamlit as st
 from chatflow_miner.lib.ui.dashboard import (
     model_discovery,
     render_agent_analysis,
+    render_conformance_analysis,
     render_exploratory_analysis,
 )
 from chatflow_miner.lib.inputs import input_dataset
@@ -47,12 +48,17 @@ with col2:
     else:
         st.text("Nenhum arquivo carregado.")
 
-tab_discover, tab_anexp, tab_anagent = st.tabs(["Descoberta de modelo de processo",
-                                                "Análise exploratória",
-                                                "Análise de agentes"])
+tab_discover, tab_anexp, tab_conformance, tab_anagent = st.tabs([
+    "Descoberta de modelo de processo",
+    "Análise exploratória",
+    "Conformidade",
+    "Análise de agentes",
+])
 with tab_discover:
     model_discovery(disabled=disabled)
 with tab_anexp:
     render_exploratory_analysis()
+with tab_conformance:
+    render_conformance_analysis()
 with tab_anagent:
     render_agent_analysis()
