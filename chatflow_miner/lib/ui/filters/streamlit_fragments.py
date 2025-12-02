@@ -401,7 +401,7 @@ def render_preview(event_log_view: EventLogView, preview_area) -> None:
                 preview_df = event_log_view.compute()
         except Exception:
             preview_df = event_log_view.compute()
-        st.data_editor(
+        st.dataframe(
             preview_df,
             use_container_width=True,
             hide_index=True,
