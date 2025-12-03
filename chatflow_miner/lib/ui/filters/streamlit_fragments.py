@@ -162,6 +162,10 @@ def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView
     """
     Exibe e aplica um filtro de variantes de casos sobre um EventLogView usando Streamlit.
     """
+    # Garante a existência da chave no session_state
+    if "selected_variants" not in st.session_state:
+        st.session_state.selected_variants = []
+
     df = get_log_eventos(which="log_eventos")
     if df is None or df.empty:
         st.data_editor(
@@ -186,12 +190,15 @@ def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView
         variant_info_by_id[info.variant_id] = info
         case_ids_by_variant.setdefault(info.variant_id, []).append(case_id)
 
+    # A coluna "selected" NÃO é mais reconstruída a partir de
+    # st.session_state.selected_variants. O data_editor será a
+    # fonte de verdade e manterá o estado entre reruns.
     rows = [
         {
             "variant_id": info.variant_id,
             "frequency": info.frequency,
             "variant": info.variant,
-            "selected": info.variant_id in st.session_state.selected_variants,
+            "selected": False,  # valor padrão; será sobrescrito pelo estado do widget
         }
         for info in sorted(
             variant_info_by_id.values(), key=lambda itm: itm.frequency, reverse=True
@@ -205,17 +212,30 @@ def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView
         hide_index=True,
         disabled=disabled,
         column_config={
-            "selected": st.column_config.CheckboxColumn("Selecionar", help="Selecione variantes para manter"),
-            "variant_id": st.column_config.TextColumn("ID da variante", width="small"),
-            "frequency": st.column_config.NumberColumn("Frequência", format="%d", width="small"),
+            "selected": st.column_config.CheckboxColumn(
+                "Selecionar", help="Selecione variantes para manter"
+            ),
+            "variant_id": st.column_config.TextColumn(
+                "ID da variante", width="small"
+            ),
+            "frequency": st.column_config.NumberColumn(
+                "Frequência", format="%d", width="small"
+            ),
             "variant": st.column_config.TextColumn("Atividades"),
         },
         key="variant-selector",
     )
 
+    # O que o usuário marcou nesta execução passa a ser a verdade.
     selected_ids: list[str] = []
     if isinstance(edited, pd.DataFrame) and not edited.empty:
-        selected_ids = edited.loc[edited["selected"], "variant_id"].astype(str).tolist()
+        selected_ids = (
+            edited.loc[edited["selected"], "variant_id"]
+            .astype(str)
+            .tolist()
+        )
+
+    # Apenas espelhamos o estado atual do widget no session_state.
     st.session_state.selected_variants = selected_ids
 
     if selected_ids:
@@ -226,7 +246,9 @@ def filter_by_variants(event_view: EventLogView, disabled: bool) -> EventLogView
         ]
         if case_ids:
             return event_view.filter(CaseFilter(case_ids=case_ids))
+
     return event_view
+
 
 
 def filter_by_agents(event_view: EventLogView, disabled: bool) -> EventLogView:
