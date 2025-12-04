@@ -12,6 +12,22 @@ import streamlit as st
 from chatflow_miner.lib.conformance.utils import ensure_marking_obj
 from chatflow_miner.lib.utils import load_dataset
 
+def _init_synthesize_clicked_state():
+    if 'synthesize_clicked' not in st.session_state:
+        st.session_state.synthesize_clicked = False
+
+def _toggle_synthesize_clicked():
+    if not st.session_state.synthesize_clicked:
+        st.session_state.synthesize_clicked = True
+
+def _init_minerar_clicked_state():
+    if 'minerar_clicked' not in st.session_state:
+        st.session_state.minerar_clicked = False
+
+def _toggle_minerar_clicked():
+    if not st.session_state.minerar_clicked:
+        st.session_state.minerar_clicked = True
+
 
 def _init_normative_model_state() -> None:
     if "normative_model" not in st.session_state:
@@ -22,6 +38,9 @@ def _init_normative_model_state() -> None:
             "source": None,
         }
 
+def _init_reference_log_state():
+    if "reference_log_state" not in st.session_state:
+        st.session_state.reference_log_state = {"log": None, "name": None, "info": None}
 
 def _reset_normative_model_state() -> None:
     _init_normative_model_state()
@@ -46,8 +65,7 @@ def _get_reference_log_state() -> dict[str, Any]:
     across reruns.
     """
 
-    if "reference_log_state" not in st.session_state:
-        st.session_state.reference_log_state = {"log": None, "name": None, "info": None}
+    _init_reference_log_state()
 
     state: dict[str, Any] = st.session_state.reference_log_state
 
@@ -286,69 +304,84 @@ def _render_model_upload_tab() -> None:
 
 @st.fragment
 def _render_discovery_tab() -> None:
+    _init_minerar_clicked_state()
     if not _reference_log_loaded():
         _render_reference_log_uploader(key_suffix="discovery")
     if _reference_log_loaded():
-        with st.form("normative_discovery_form"):
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.caption("O modelo será minerado a partir do log de referência carregado.")
-            with c2:
-                noise = st.slider(
-                    "noise_threshold",
-                    min_value=0.0,
-                    max_value=1.0,
-                    value=0.2,
-                    step=0.05,
-                    disabled=not _reference_log_loaded(),
-                )
-            submitted = st.form_submit_button(
-                "Minerar", use_container_width=True, disabled=not _reference_log_loaded()
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            st.caption("O modelo será minerado a partir do log de referência carregado.")
+        with c2:
+            noise = st.slider(
+                "noise_threshold",
+                min_value=0.0,
+                max_value=1.0,
+                value=0.2,
+                step=0.05,
+                disabled=not _reference_log_loaded(),
             )
-            if submitted and _reference_log_loaded():
-                _discover_from_log(noise_threshold=noise)
+        if st.button(
+            "Minerar", use_container_width=True, disabled=not _reference_log_loaded()
+        ):
+            _toggle_minerar_clicked()
+            # Precisamos adicionar esse rerun devido ao uso de st.fragment em _render_variant_tab.
+            # Já que a função que nos chama é um fragment, os elementos dela são atualizados independentemente
+            # do resto do app. Ou seja, mesmo a função mudando o estado global do app, como ela é executada
+            # independentemente, os outros objetos não "percebem" a mudança do estado.
+            st.rerun(scope="app")
+        if st.session_state.minerar_clicked and _reference_log_loaded():
+            _discover_from_log(noise_threshold=noise)
 
 
 @st.fragment
 def _render_variant_tab() -> None:
+    _init_synthesize_clicked_state()
     if not _reference_log_loaded():
         _render_reference_log_uploader(key_suffix="variant")
         selected: list[str] = []
         manual_lines: list[str] = []
     else:
-        c1, c2 = st.columns(2)
-        with c1:
-            st.caption("Selecione variantes do log de referência")
-            variants_options: list[str] = []
-            pm4py = _import_optional("pm4py")
-            variants_get = _import_optional("pm4py.statistics.variants.log.get")
-            if pm4py is None or variants_get is None:
-                st.warning("pm4py é necessário para extrair variantes")
-            else:
-                try:
-                    event_log = pm4py.convert_to_event_log(_get_reference_log_state().get("log"))
-                    variants_map = variants_get.get_variants(event_log)
-                    variants_options = [" -> ".join(map(str, v)) for v in variants_map.keys()]
-                except Exception as exc:  # noqa: BLE001
-                    st.warning(f"Não foi possível extrair variantes: {exc}")
-            selected = st.multiselect(
-                "Variantes", options=variants_options, disabled=not _reference_log_loaded()
-            )
-        with c2:
-            st.caption("Ou insira traços manualmente (um por linha)")
-            manual_input = st.text_area(
-                "Traços",
-                placeholder="A -> B -> C\nA -> C -> D",
-                height=120,
-                disabled=not _reference_log_loaded(),
-            )
-            manual_lines = [line for line in manual_input.splitlines() if line.strip()]
-    synthesize_clicked = st.button(
+        with st.container(border=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                st.caption("Selecione variantes do log de referência")
+                variants_options: list[str] = []
+                pm4py = _import_optional("pm4py")
+                variants_get = _import_optional("pm4py.statistics.variants.log.get")
+                if pm4py is None or variants_get is None:
+                    st.warning("pm4py é necessário para extrair variantes")
+                else:
+                    try:
+                        event_log = pm4py.convert_to_event_log(_get_reference_log_state().get("log"))
+                        variants_map = variants_get.get_variants(event_log)
+                        variants_options = [" -> ".join(map(str, v)) for v in variants_map.keys()]
+                    except Exception as exc:  # noqa: BLE001
+                        st.warning(f"Não foi possível extrair variantes: {exc}")
+                selected = st.multiselect(
+                    "Variantes", options=variants_options, disabled=not _reference_log_loaded()
+                )
+            with c2:
+                st.caption("Ou insira traços manualmente (um por linha)")
+                manual_input = st.text_area(
+                    "Traços",
+                    placeholder="A -> B -> C\nA -> C -> D",
+                    height=120,
+                    disabled=not _reference_log_loaded(),
+                )
+                manual_lines = [line for line in manual_input.splitlines() if line.strip()]
+    if st.button(
         "Sintetizar Modelo",
         use_container_width=True,
-        disabled=not _reference_log_loaded(),
-    )
-    if synthesize_clicked and _reference_log_loaded():
+        disabled=not _reference_log_loaded()
+    ):
+        _toggle_synthesize_clicked()
+        # Precisamos adicionar esse rerun devido ao uso de st.fragment em _render_variant_tab.
+        # Já que a função que nos chama é um fragment, os elementos dela são atualizados independentemente
+        # do resto do app. Ou seja, mesmo a função mudando o estado global do app, como ela é executada
+        # independentemente, os outros objetos não "percebem" a mudança do estado.
+        st.rerun(scope="app")
+
+    if st.session_state.synthesize_clicked and _reference_log_loaded():
         _discover_from_variants(selected_variants=selected, manual_traces=manual_lines)
 
 

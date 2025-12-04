@@ -59,7 +59,7 @@ def _render_token_replay_tab(log_df: Any, normative_model: dict[str, Any]) -> No
         mean_fitness = (
             float(aggregated["trace_fitness"].mean()) if not aggregated.empty else 0.0
         )
-        st.metric("Fitness Média (Trace Level)", f"{mean_fitness:.3f}")
+        st.metric("Fitness Média", f"{mean_fitness:.3f}")
 
         display_df = aggregated.copy()
         display_df["is_fit"] = (
@@ -104,8 +104,10 @@ def _render_alignment_tab(log_df: Any, normative_model: dict[str, Any]) -> None:
             return
         status.update(label="Alinhamentos concluídos", state="complete")
 
-        mean_cost = float(aggregated["cost"].mean()) if not aggregated.empty else 0.0
-        st.metric("Custo Médio de Alinhamento", f"{mean_cost:.3f}")
+        mean_fitness = (
+            float(aggregated["fitness"].mean()) if not aggregated.empty else 0.0
+        )
+        st.metric("Fitness Média", f"{mean_fitness:.3f}")
 
         max_cost = aggregated["cost"].max() if not aggregated.empty else 1.0
         st.dataframe(
