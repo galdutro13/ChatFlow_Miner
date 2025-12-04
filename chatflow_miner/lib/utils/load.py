@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -13,13 +14,27 @@ from chatflow_miner.lib.constants import (
 from chatflow_miner.lib.utils.verify import verify_format
 
 
-def load_dataset(file: str, load_options: dict[Any, Any]) -> pd.DataFrame:
+def load_dataset(file: Any, load_options: dict[Any, Any]) -> pd.DataFrame:
     """
     Carrega um arquivo de log de eventos em formato CSV ou XES e retorna um DataFrame do Pandas.
     """
     try:
-        df = pd.read_csv(file, sep=load_options.get("sep", ","))
-        df = df.drop(columns="duration_seconds", errors="ignore").copy()
+        ext = Path(getattr(file, "name", "")).suffix.lower()
+        if ext == ".xes":
+            df = pm4py.convert_to_dataframe(pm4py.read_xes(file))
+            df = df.rename(
+                columns={
+                    "case:concept:name": COLUMN_CASE_ID,
+                    "concept:name": COLUMN_ACTIVITY,
+                    "time:timestamp": COLUMN_END_TS,
+                    "start_timestamp": COLUMN_START_TS,
+                }
+            )
+            if COLUMN_START_TS not in df.columns and COLUMN_END_TS in df.columns:
+                df[COLUMN_START_TS] = df[COLUMN_END_TS]
+        else:
+            df = pd.read_csv(file, sep=load_options.get("sep", ","))
+            df = df.drop(columns="duration_seconds", errors="ignore").copy()
 
         verify_format(df)
 

@@ -10,15 +10,8 @@ from collections.abc import Mapping
 import streamlit as st
 
 from chatflow_miner.lib.conformance.utils import ensure_marking_obj
+from chatflow_miner.lib.utils import load_dataset
 
-def _init_sintetizar_modelo_state():
-    """Função para iniciar o estado do botão de sintetizar modelo"""
-    if "sintetizar_modelo" not in st.session_state:
-        st.session_state.sintetizar_modelo = False
-
-def _toggle_sistetizar_modelo():
-    """Muda o estado de sintetizar modelo para True"""
-    st.session_state.sintetizar_modelo = True
 
 def _init_normative_model_state() -> None:
     if "normative_model" not in st.session_state:
@@ -30,11 +23,60 @@ def _init_normative_model_state() -> None:
         }
 
 
+def _reset_normative_model_state() -> None:
+    _init_normative_model_state()
+    st.session_state.normative_model.update(
+        {"net": None, "initial_marking": None, "final_marking": None, "source": None}
+    )
+
+
 def _import_optional(module_name: str) -> Any | None:
     spec = importlib.util.find_spec(module_name)
     if spec is None:
         return None
     return importlib.import_module(module_name)
+
+
+def _get_reference_log_state() -> dict[str, Any]:
+    """Return the canonical reference-log state stored in session_state.
+
+    Legacy top-level keys (reference_log, reference_log_name, reference_log_info)
+    previously mirrored the same information; they are migrated once into the
+    structured ``reference_log_state`` mapping to avoid dual sources of truth
+    across reruns.
+    """
+
+    if "reference_log_state" not in st.session_state:
+        st.session_state.reference_log_state = {"log": None, "name": None, "info": None}
+
+    state: dict[str, Any] = st.session_state.reference_log_state
+
+    legacy_keys = (
+        ("reference_log", "log"),
+        ("reference_log_name", "name"),
+        ("reference_log_info", "info"),
+    )
+    for legacy_key, state_key in legacy_keys:
+        if legacy_key in st.session_state and state.get(state_key) is None:
+            state[state_key] = st.session_state.get(legacy_key)
+        st.session_state.pop(legacy_key, None)
+
+    # Reassign to ensure Streamlit tracks in-place updates for reruns
+    st.session_state.reference_log_state = state
+
+    return st.session_state.reference_log_state
+
+
+def _clear_reference_log() -> None:
+    state = _get_reference_log_state()
+    state.update({"log": None, "name": None, "info": None})
+    _reset_normative_model_state()
+
+
+def _persist_reference_log(log: Any, load_info: Mapping[str, Any]) -> None:
+    state = _get_reference_log_state()
+    state.update({"log": log, "name": load_info.get("file_name"), "info": load_info})
+    _reset_normative_model_state()
 
 
 def _persist_normative_model(net: Any, im: Any, fm: Any, *, source: str) -> None:
@@ -101,9 +143,36 @@ def _load_model_from_upload(uploaded: Any) -> None:
         _render_petri_preview(net, im, fm)
 
 
-def _discover_from_log(log_df: Any, *, noise_threshold: float) -> None:
-    if log_df is None or len(log_df) == 0:
-        st.warning("Nenhum log disponível para mineração")
+def _render_reference_log_uploader(*, key_suffix: str = "default") -> None:
+    st.info(
+        "Envie um log de referência (CSV ou XES) para minerar o modelo normativo.",
+        icon="📁",
+    )
+    sep_key = f"reference_log_sep_{key_suffix}"
+    sep = st.selectbox(
+        "Separador do CSV",
+        options=[",", ";", "\t"],
+        index=0,
+        key=sep_key,
+    )
+    uploader_key = f"reference_log_uploader_{key_suffix}"
+    uploaded = st.file_uploader(
+        "Carregar log de referência (CSV/XES)",
+        type=["csv", "xes"],
+        accept_multiple_files=False,
+        key=uploader_key,
+    )
+    if uploaded is not None:
+        load_info = {"sep": sep, "file_name": uploaded.name}
+        log = load_dataset(uploaded, load_info)
+        _persist_reference_log(log, load_info)
+        st.rerun()
+
+
+def _discover_from_log(*, noise_threshold: float) -> None:
+    reference_log = _get_reference_log_state().get("log")
+    if reference_log is None or len(reference_log) == 0:
+        st.warning("Nenhum log de referência disponível para mineração")
         return
 
     pm4py = _import_optional("pm4py")
@@ -112,7 +181,9 @@ def _discover_from_log(log_df: Any, *, noise_threshold: float) -> None:
         return
 
     with st.spinner("Executando Inductive Miner..."):
-        net, im, fm = pm4py.discover_petri_net_inductive(log_df, noise_threshold=noise_threshold)
+        net, im, fm = pm4py.discover_petri_net_inductive(
+            reference_log, noise_threshold=noise_threshold
+        )
     _persist_normative_model(net, im, fm, source="log_full")
     _render_petri_preview(net, im, fm)
 
@@ -153,20 +224,19 @@ def _build_synthetic_log_from_variants(variants: Iterable[Iterable[Any]]) -> Any
     return log
 
 
-def _discover_from_variants(
-    log_df: Any, selected_variants: list[str], manual_traces: list[str]
-) -> None:
+def _discover_from_variants(selected_variants: list[str], manual_traces: list[str]) -> None:
     pm4py = _import_optional("pm4py")
     variants_get = _import_optional("pm4py.statistics.variants.log.get")
     if pm4py is None or variants_get is None:
         st.error("pm4py é necessário para minerar variantes. Instale a dependência para continuar.")
         return
 
-    if log_df is None or len(log_df) == 0:
-        st.warning("Nenhum log base disponível para minerar variantes")
+    reference_log = _get_reference_log_state().get("log")
+    if reference_log is None or len(reference_log) == 0:
+        st.warning("Nenhum log de referência disponível para minerar variantes")
         return
 
-    event_log = pm4py.convert_to_event_log(log_df)
+    event_log = pm4py.convert_to_event_log(reference_log)
     variants_map = variants_get.get_variants(event_log)
 
     selected_variant_traces: list[list[str]] = []
@@ -199,65 +269,121 @@ def _discover_from_variants(
     _render_petri_preview(net, im, fm)
 
 
-def render_normative_model_selector(log_df: Any | None = None) -> None:
-    _init_normative_model_state()
-    st.markdown("### Modelo normativo")
-    tabs = st.tabs(["Por arquivo", "Por descoberta (Log Completo)", "Por variante"])
+def _reference_log_loaded() -> bool:
+    return _get_reference_log_state().get("log") is not None
 
-    with tabs[0]:
-        uploaded = st.file_uploader(
-            "Carregar modelo (pnml, bpmn, ptml)",
-            type=["pnml", "bpmn", "ptml"],
-            accept_multiple_files=False,
-        )
-        if uploaded is not None:
-            _load_model_from_upload(uploaded)
 
-    with tabs[1]:
+@st.fragment
+def _render_model_upload_tab() -> None:
+    uploaded = st.file_uploader(
+        "Carregar modelo (pnml, bpmn, ptml)",
+        type=["pnml", "bpmn", "ptml"],
+        accept_multiple_files=False,
+    )
+    if uploaded is not None:
+        _load_model_from_upload(uploaded)
+
+
+@st.fragment
+def _render_discovery_tab() -> None:
+    if not _reference_log_loaded():
+        _render_reference_log_uploader(key_suffix="discovery")
+    if _reference_log_loaded():
         with st.form("normative_discovery_form"):
             c1, c2 = st.columns([2, 1])
             with c1:
-                st.caption("Selecione o log para mineração")
-                st.selectbox(
-                    "Log disponível",
-                    options=["Log carregado"] if log_df is not None else ["Nenhum log"],
-                    disabled=log_df is None,
-                    key="normative_discovery_log_selector",
-                )
+                st.caption("O modelo será minerado a partir do log de referência carregado.")
             with c2:
-                noise = st.slider("noise_threshold", min_value=0.0, max_value=1.0, value=0.2, step=0.05)
-            submitted = st.form_submit_button("Minerar", use_container_width=True)
-            if submitted:
-                _discover_from_log(log_df, noise_threshold=noise)
+                noise = st.slider(
+                    "noise_threshold",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.2,
+                    step=0.05,
+                    disabled=not _reference_log_loaded(),
+                )
+            submitted = st.form_submit_button(
+                "Minerar", use_container_width=True, disabled=not _reference_log_loaded()
+            )
+            if submitted and _reference_log_loaded():
+                _discover_from_log(noise_threshold=noise)
 
-    with tabs[2]:
+
+@st.fragment
+def _render_variant_tab() -> None:
+    if not _reference_log_loaded():
+        _render_reference_log_uploader(key_suffix="variant")
+        selected: list[str] = []
+        manual_lines: list[str] = []
+    else:
         c1, c2 = st.columns(2)
         with c1:
-            st.caption("Selecione variantes do log base")
+            st.caption("Selecione variantes do log de referência")
             variants_options: list[str] = []
-            if log_df is not None:
-                pm4py = _import_optional("pm4py")
-                variants_get = _import_optional("pm4py.statistics.variants.log.get")
-                if pm4py is None or variants_get is None:
-                    st.warning("pm4py é necessário para extrair variantes")
-                else:
-                    try:
-                        event_log = pm4py.convert_to_event_log(log_df)
-                        variants_map = variants_get.get_variants(event_log)
-                        variants_options = [" -> ".join(map(str, v)) for v in variants_map.keys()]
-                    except Exception as exc:  # noqa: BLE001
-                        st.warning(f"Não foi possível extrair variantes: {exc}")
-            selected = st.multiselect("Variantes", options=variants_options)
+            pm4py = _import_optional("pm4py")
+            variants_get = _import_optional("pm4py.statistics.variants.log.get")
+            if pm4py is None or variants_get is None:
+                st.warning("pm4py é necessário para extrair variantes")
+            else:
+                try:
+                    event_log = pm4py.convert_to_event_log(_get_reference_log_state().get("log"))
+                    variants_map = variants_get.get_variants(event_log)
+                    variants_options = [" -> ".join(map(str, v)) for v in variants_map.keys()]
+                except Exception as exc:  # noqa: BLE001
+                    st.warning(f"Não foi possível extrair variantes: {exc}")
+            selected = st.multiselect(
+                "Variantes", options=variants_options, disabled=not _reference_log_loaded()
+            )
         with c2:
             st.caption("Ou insira traços manualmente (um por linha)")
             manual_input = st.text_area(
-                "Traços", placeholder="A -> B -> C\nA -> C -> D", height=120
+                "Traços",
+                placeholder="A -> B -> C\nA -> C -> D",
+                height=120,
+                disabled=not _reference_log_loaded(),
             )
-        st.button("Sintetizar Modelo", use_container_width=True, on_click=_toggle_sistetizar_modelo)
-        sintetizar_modelo = st.session_state.get("sintetizar_modelo", False)
-        if sintetizar_modelo:
             manual_lines = [line for line in manual_input.splitlines() if line.strip()]
-            _discover_from_variants(log_df, selected_variants=selected, manual_traces=manual_lines)
+    synthesize_clicked = st.button(
+        "Sintetizar Modelo",
+        use_container_width=True,
+        disabled=not _reference_log_loaded(),
+    )
+    if synthesize_clicked and _reference_log_loaded():
+        _discover_from_variants(selected_variants=selected, manual_traces=manual_lines)
+
+
+@st.fragment
+def render_button_fragment() -> None:
+    reference_state = _get_reference_log_state()
+    reference_name = reference_state.get("name")
+
+    if _reference_log_loaded() and reference_name:
+        info_col, action_col = st.columns([6, 1])
+        with info_col:
+            st.caption(f"Usando log de referência: {reference_name}")
+        with action_col:
+            if st.button("Remover", type="tertiary", key="remove-reference-log"):
+                _clear_reference_log()
+                st.rerun()
+
+def render_normative_model_selector(_execution_log: Any | None = None) -> None:
+    _init_normative_model_state()
+    render_button_fragment()
+
+
+    st.markdown("### Modelo normativo")
+
+
+    tabs = st.tabs(["Por arquivo", "Por descoberta (Log Completo)", "Por variante"])
+
+    with tabs[0]:
+        _render_model_upload_tab()
+
+    with tabs[1]:
+        _render_discovery_tab()
+
+    with tabs[2]:
+        _render_variant_tab()
 
     if st.session_state.normative_model["net"] is not None:
         st.success("Modelo normativo pronto para análise")

@@ -33,13 +33,13 @@ def _render_model_summary(normative_model: dict[str, Any]) -> None:
     st.info(f"Rede de Petri: {places} lugares, {transitions} transições", icon="ℹ️")
 
 
-
+@st.fragment
 def _render_token_replay_tab(log_df: Any, normative_model: dict[str, Any]) -> None:
     net = normative_model.get("net")
     im = normative_model.get("initial_marking")
     fm = normative_model.get("final_marking")
 
-    if st.button("Executar Replay", key="run_token_replay"):
+    if st.button("Executar Replay", key="run_token_replay", disabled=net is None):
         if net is None or im is None or fm is None:
             st.warning("Carregue um modelo normativo antes de executar o replay")
             return
@@ -78,13 +78,13 @@ def _render_token_replay_tab(log_df: Any, normative_model: dict[str, Any]) -> No
         )
 
 
-
+@st.fragment
 def _render_alignment_tab(log_df: Any, normative_model: dict[str, Any]) -> None:
     net = normative_model.get("net")
     im = normative_model.get("initial_marking")
     fm = normative_model.get("final_marking")
 
-    if st.button("Executar Alinhamento", key="run_alignments"):
+    if st.button("Executar Alinhamento", key="run_alignments", disabled=net is None):
         if net is None or im is None or fm is None:
             st.warning("Carregue um modelo normativo antes de executar alinhamentos")
             return
@@ -119,7 +119,6 @@ def _render_alignment_tab(log_df: Any, normative_model: dict[str, Any]) -> None:
             use_container_width=True,
         )
 
-@st.fragment
 def render_conformance_analysis() -> None:
     log_df = get_log_eventos(which="log_eventos")
 
