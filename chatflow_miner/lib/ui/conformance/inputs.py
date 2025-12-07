@@ -187,6 +187,54 @@ def _render_reference_log_uploader(*, key_suffix: str = "default") -> None:
         st.rerun()
 
 
+def _reference_log_dialog_open_key(key_suffix: str) -> str:
+    return f"reference_log_dialog_open_{key_suffix}"
+
+def _open_reference_log_dialog(key_suffix: str, *, open_state_key: str | None = None) -> None:
+    st.session_state[open_state_key or _reference_log_dialog_open_key(key_suffix)] = True
+
+
+def _close_reference_log_dialog(key_suffix: str, *, open_state_key: str | None = None) -> None:
+    st.session_state[open_state_key or _reference_log_dialog_open_key(key_suffix)] = False
+
+
+@st.dialog("Carregar log de referência", dismissible=False)
+def _reference_log_dialog(*, key_suffix: str = "default", open_state_key: str | None = None) -> None:
+    open_state_key = open_state_key or _reference_log_dialog_open_key(key_suffix)
+    _render_reference_log_uploader(key_suffix=key_suffix)
+    if st.button(
+        "Fechar",
+        key=f"close_reference_log_dialog_{key_suffix}",
+        type="secondary",
+        use_container_width=True,
+        on_click=_close_reference_log_dialog,
+        kwargs={"key_suffix": key_suffix, "open_state_key": open_state_key},
+    ):
+        # Fechar a caixa de diálogo
+        st.rerun(scope="app")
+
+    if _reference_log_loaded():
+        _close_reference_log_dialog(key_suffix, open_state_key=open_state_key)
+
+
+def _render_reference_log_dialog_launcher(
+    *, key_suffix: str = "default", label: str = "Carregar log de referência"
+) -> None:
+    open_state_key = _reference_log_dialog_open_key(key_suffix)
+    if st.button(
+        label,
+        use_container_width=True,
+        key=f"open_reference_log_dialog_{key_suffix}",
+    ):
+        _open_reference_log_dialog(key_suffix, open_state_key=open_state_key)
+
+    if _reference_log_loaded():
+        _close_reference_log_dialog(key_suffix, open_state_key=open_state_key)
+
+    if st.session_state.get(open_state_key):
+        _reference_log_dialog(key_suffix=key_suffix, open_state_key=open_state_key)
+
+
 def _discover_from_log(*, noise_threshold: float) -> None:
     reference_log = _get_reference_log_state().get("log")
     if reference_log is None or len(reference_log) == 0:
@@ -306,7 +354,7 @@ def _render_model_upload_tab() -> None:
 def _render_discovery_tab() -> None:
     _init_minerar_clicked_state()
     if not _reference_log_loaded():
-        _render_reference_log_uploader(key_suffix="discovery")
+        _render_reference_log_dialog_launcher(key_suffix="discovery")
     if _reference_log_loaded():
         c1, c2 = st.columns([2, 1])
         with c1:
@@ -337,7 +385,7 @@ def _render_discovery_tab() -> None:
 def _render_variant_tab() -> None:
     _init_synthesize_clicked_state()
     if not _reference_log_loaded():
-        _render_reference_log_uploader(key_suffix="variant")
+        _render_reference_log_dialog_launcher(key_suffix="variant")
         selected: list[str] = []
         manual_lines: list[str] = []
     else:
@@ -407,7 +455,7 @@ def render_normative_model_selector(_execution_log: Any | None = None) -> None:
     st.markdown("### Modelo normativo")
 
 
-    tabs = st.tabs(["Por arquivo", "Por descoberta (Log Completo)", "Por variante"])
+    tabs = st.tabs(["Por modelo", "Por descoberta (Log Completo)", "Por variante"])
 
     with tabs[0]:
         _render_model_upload_tab()
