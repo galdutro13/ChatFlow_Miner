@@ -49,6 +49,32 @@ def _reset_normative_model_state() -> None:
     )
 
 
+def _clear_reference_log_dialog_flags() -> None:
+    """Reset all reference log dialog open flags.
+
+    Dialog visibility is tracked via ``reference_log_dialog_open_{suffix}`` keys. Clearing
+    these flags ensures dialogs do not reopen unexpectedly after lifecycle events such as
+    uploads or removals.
+    """
+
+    for key in list(st.session_state.keys()):
+        if str(key).startswith("reference_log_dialog_open_"):
+            st.session_state[key] = False
+
+
+def _ensure_reference_log_controls_initialized(key_suffix: str) -> None:
+    """Guarantee default UI control values exist in session_state.
+
+    Streamlit's testing harness expects widget state entries to persist across reruns even
+    if widgets are temporarily not rendered. Initialising selectbox defaults prevents
+    KeyErrors when the dialog closes and the uploader controls are absent.
+    """
+
+    sep_key = f"reference_log_sep_{key_suffix}"
+    if sep_key not in st.session_state:
+        st.session_state[sep_key] = ","
+
+
 def _import_optional(module_name: str) -> Any | None:
     spec = importlib.util.find_spec(module_name)
     if spec is None:
@@ -89,12 +115,14 @@ def _clear_reference_log() -> None:
     state = _get_reference_log_state()
     state.update({"log": None, "name": None, "info": None})
     _reset_normative_model_state()
+    _clear_reference_log_dialog_flags()
 
 
 def _persist_reference_log(log: Any, load_info: Mapping[str, Any]) -> None:
     state = _get_reference_log_state()
     state.update({"log": log, "name": load_info.get("file_name"), "info": load_info})
     _reset_normative_model_state()
+    _clear_reference_log_dialog_flags()
 
 
 def _persist_normative_model(net: Any, im: Any, fm: Any, *, source: str) -> None:
@@ -161,11 +189,12 @@ def _load_model_from_upload(uploaded: Any) -> None:
         _render_petri_preview(net, im, fm)
 
 
-def _render_reference_log_uploader(*, key_suffix: str = "default") -> None:
+def _render_reference_log_uploader(*, key_suffix: str = "default", open_state_key: str | None = None) -> None:
     st.info(
         "Envie um log de referência (CSV ou XES) para minerar o modelo normativo.",
         icon="📁",
     )
+    open_state_key = open_state_key or _reference_log_dialog_open_key(key_suffix)
     sep_key = f"reference_log_sep_{key_suffix}"
     sep = st.selectbox(
         "Separador do CSV",
@@ -184,7 +213,8 @@ def _render_reference_log_uploader(*, key_suffix: str = "default") -> None:
         load_info = {"sep": sep, "file_name": uploaded.name}
         log = load_dataset(uploaded, load_info)
         _persist_reference_log(log, load_info)
-        st.rerun()
+        _close_reference_log_dialog(key_suffix, open_state_key=open_state_key)
+        st.rerun(scope="app")
 
 
 def _reference_log_dialog_open_key(key_suffix: str) -> str:
@@ -201,7 +231,12 @@ def _close_reference_log_dialog(key_suffix: str, *, open_state_key: str | None =
 @st.dialog("Carregar log de referência", dismissible=False)
 def _reference_log_dialog(*, key_suffix: str = "default", open_state_key: str | None = None) -> None:
     open_state_key = open_state_key or _reference_log_dialog_open_key(key_suffix)
-    _render_reference_log_uploader(key_suffix=key_suffix)
+    _ensure_reference_log_controls_initialized(key_suffix)
+    if _reference_log_loaded():
+        _close_reference_log_dialog(key_suffix, open_state_key=open_state_key)
+        return
+
+    _render_reference_log_uploader(key_suffix=key_suffix, open_state_key=open_state_key)
     if st.button(
         "Fechar",
         key=f"close_reference_log_dialog_{key_suffix}",
@@ -213,14 +248,12 @@ def _reference_log_dialog(*, key_suffix: str = "default", open_state_key: str | 
         # Fechar a caixa de diálogo
         st.rerun(scope="app")
 
-    if _reference_log_loaded():
-        _close_reference_log_dialog(key_suffix, open_state_key=open_state_key)
-
 
 def _render_reference_log_dialog_launcher(
     *, key_suffix: str = "default", label: str = "Carregar log de referência"
 ) -> None:
     open_state_key = _reference_log_dialog_open_key(key_suffix)
+    _ensure_reference_log_controls_initialized(key_suffix)
     if st.button(
         label,
         use_container_width=True,
@@ -368,17 +401,17 @@ def _render_discovery_tab() -> None:
                 step=0.05,
                 disabled=not _reference_log_loaded(),
             )
-        if st.button(
+    if st.button(
             "Minerar", use_container_width=True, disabled=not _reference_log_loaded()
-        ):
-            _toggle_minerar_clicked()
-            # Precisamos adicionar esse rerun devido ao uso de st.fragment em _render_variant_tab.
-            # Já que a função que nos chama é um fragment, os elementos dela são atualizados independentemente
-            # do resto do app. Ou seja, mesmo a função mudando o estado global do app, como ela é executada
-            # independentemente, os outros objetos não "percebem" a mudança do estado.
-            st.rerun(scope="app")
-        if st.session_state.minerar_clicked and _reference_log_loaded():
-            _discover_from_log(noise_threshold=noise)
+    ):
+        _toggle_minerar_clicked()
+        # Precisamos adicionar esse rerun devido ao uso de st.fragment em _render_variant_tab.
+        # Já que a função que nos chama é um fragment, os elementos dela são atualizados independentemente
+        # do resto do app. Ou seja, mesmo a função mudando o estado global do app, como ela é executada
+        # independentemente, os outros objetos não "percebem" a mudança do estado.
+        st.rerun(scope="app")
+    if st.session_state.minerar_clicked and _reference_log_loaded():
+        _discover_from_log(noise_threshold=noise)
 
 
 @st.fragment
